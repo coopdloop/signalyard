@@ -1,0 +1,58 @@
+name: signalyard
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: signalyard
+      POSTGRES_PASSWORD: signalyard
+      POSTGRES_DB: signalyard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signalyard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - natsdata:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  core-api-gateway:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.core-api-gateway
+    environment:
+      PORT: "8080"
+      POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
+      NATS_URL: nats://nats:4222
+      JWT_SIGNING_SECRET: dev-jwt-secret-change-me
+      HEC_TOKEN_SALT: dev-hec-salt-change-me
+      DEV_ADMIN_TOKEN: dev-admin-token
+      RUN_MIGRATIONS: "true"
+      MIGRATIONS_PATH: /app/migrations/0001_init.sql
+      # OIDC_ISSUER_URL / OIDC_CLIENT_ID / OIDC_CLIENT_SECRET: set when Keycloak lands (Phase 4)
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  natsdata:
