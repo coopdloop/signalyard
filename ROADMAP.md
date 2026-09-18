@@ -45,10 +45,13 @@ Single Go binary: public API + MCP server + auth + JetStream publishing.
 - [x] CORS on Go APIs for browser access (dev-permissive)
 - [x] `scripts/smoke-phase4.sh`: infra health, datasource/dashboard provisioning, Loki routing, OTLP trace/metric round-trips, dashboard serving
 
-## Cross-cutting / hardening (ongoing)
+## Cross-cutting / hardening
 
-- [ ] OpenAPI spec generation published at `/openapi.json` (currently a stub URL in the manifest)
-- [ ] Idempotency keys on `/v1/collect`; rate limiting per API key
-- [ ] JWT (short-lived, per-agent) as alternative to long-lived API keys
-- [ ] Approval audit-log surfacing (table exists in migration)
-- [ ] Tracing propagation end-to-end (gateway → JetStream → normalizer)
+- [x] OpenAPI spec published at `/openapi.json` (hand-maintained `docs/openapi.json`, embedded copy served by the gateway)
+- [x] Idempotency keys on `/v1/collect` (`Idempotency-Key` header, duplicate → 200 with original response; `0003_idempotency.sql`)
+- [x] Per-agent rate limiting (token bucket, `RATE_LIMIT_RPS`/`RATE_LIMIT_BURST`)
+- [x] Short-lived per-agent JWTs (`POST /v1/tokens`, HS256, TTL-capped; `RequireAPIKey` accepts both)
+- [x] Role enforcement: registry admin mutations + gateway key issuance require admin/approver role (human veto hardening)
+- [x] Approval audit-log surfacing (`GET /v1/audit-log` + dashboard Audit Log page)
+- [x] Tracing end-to-end: otelhttp server spans on all Go services, trace context propagated through JetStream headers (gateway → normalizer), opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`
+- [ ] Real LLM backend validation (anthropic/openai/ollama implemented; only `heuristic` run live — pending API keys)
