@@ -18,16 +18,21 @@ import (
 // shutdown: services run untraced with zero overhead and no collector required.
 func SetupTelemetry(ctx context.Context, serviceName string) (shutdown func(context.Context) error, err error) {
 	noop := func(context.Context) error { return nil }
-	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
 		return noop, nil
 	}
-	exporter, err := otlptracegrpc.New(ctx)
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(), // dev collector has no TLS
+	)
 	if err != nil {
 		return nil, err
 	}
+	// NewSchemaless avoids schema-URL conflicts with the SDK's default resource.
 	res, err := resource.Merge(
 		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName(serviceName)),
+		resource.NewSchemaless(semconv.ServiceName(serviceName)),
 	)
 	if err != nil {
 		return nil, err
