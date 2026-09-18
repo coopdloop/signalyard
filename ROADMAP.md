@@ -19,12 +19,14 @@ Single Go binary: public API + MCP server + auth + JetStream publishing.
 - [x] docker-compose dev stack (postgres + nats + gateway), Dockerfile, Makefile
 - [ ] Unit/integration coverage expansion (table-driven route contract tests vs spec)
 
-## Phase 2 — Schema Registry + Normalizer/Router
+## Phase 2 — Schema Registry + Normalizer/Router ✅
 
-- [ ] `schema_registry_service` (Go/chi, :8082): schemas + categories CRUD, proposals queue, approve/reject with git-backed YAML double-write (ADR-003), agent registry admin endpoints, approval events to NATS
-- [ ] `normalizer_router` (Go, :8081): consume `ingest`, validate against registry schemas (gojsonschema + local cache), route to Loki/Tempo/Mimir/Postgres, quarantine unknown shapes to `quarantine` stream, replay on approval
-- [ ] Wire gateway `SCHEMA_REGISTRY_URL` proxying against the live registry
-- [ ] Compose: add loki, tempo, mimir, grafana
+- [x] `schema_registry_service` (Go/chi, :8082): schemas + categories CRUD with versioning, proposals queue, approve/reject with git-backed double-write (go-git; NoopGit in dev), audit log, agent registry admin, `schema.approved` events to NATS
+- [x] `normalizer_router` (Go, :8081): durable consume of `events.ingest.>`, gojsonschema validation with 30s cached registry lookups (last-known fallback), routing to Postgres/Loki per routing_yaml, quarantine to Postgres + `quarantine` stream, auto-replay on approval + manual replay endpoints, `/v1/routing-stats`
+- [x] Gateway `SCHEMA_REGISTRY_URL` proxying live (`list_categories`, `propose_schema` with MCP→registry contract translation)
+- [x] Migration ledger (`schema_migrations`) + `0002_quarantine_attempts.sql`
+- [x] Full-loop E2E (`scripts/smoke-phase2.sh`): unknown → quarantine → proposal → approve → auto-replay → queryable
+- [ ] Compose: add loki, tempo, mimir, grafana (moved to Phase 4 with dashboards)
 
 ## Phase 3 — Webhook Adapter + Classifier Agent
 

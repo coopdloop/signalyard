@@ -43,7 +43,8 @@ services:
       HEC_TOKEN_SALT: dev-hec-salt-change-me
       DEV_ADMIN_TOKEN: dev-admin-token
       RUN_MIGRATIONS: "true"
-      MIGRATIONS_PATH: /app/migrations/0001_init.sql
+      MIGRATIONS_DIR: /app/migrations
+      SCHEMA_REGISTRY_URL: http://schema-registry:8082
       # OIDC_ISSUER_URL / OIDC_CLIENT_ID / OIDC_CLIENT_SECRET: set when Keycloak lands (Phase 4)
     ports:
       - "8080:8080"
@@ -52,6 +53,50 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+
+  schema-registry:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.schema-registry
+    environment:
+      PORT: "8082"
+      POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
+      NATS_URL: nats://nats:4222
+      HEC_TOKEN_SALT: dev-hec-salt-change-me
+      JWT_SIGNING_SECRET: dev-jwt-secret-change-me
+      DEV_ADMIN_TOKEN: dev-admin-token
+      # GIT_REPO_URL / GIT_SSH_KEY_PATH: unset in dev -> NoopGit (Postgres is source of truth)
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+  normalizer-router:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.normalizer-router
+    environment:
+      PORT: "8081"
+      POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
+      NATS_URL: nats://nats:4222
+      SCHEMA_REGISTRY_URL: http://schema-registry:8082
+      SCHEMA_REGISTRY_TOKEN: dev-admin-token
+      HEC_TOKEN_SALT: dev-hec-salt-change-me
+      JWT_SIGNING_SECRET: dev-jwt-secret-change-me
+      DEV_ADMIN_TOKEN: dev-admin-token
+      # LOKI_PUSH_URL: set when Loki lands (Phase 4)
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      schema-registry:
+        condition: service_started
 
 volumes:
   pgdata:

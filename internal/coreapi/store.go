@@ -72,9 +72,34 @@ func NewStore(ctx context.Context, dsn string) (*Store, error) {
 
 func (s *Store) Close() { s.pool.Close() }
 
-func (s *Store) Migrate(ctx context.Context, sql string) error {
-	_, err := s.pool.Exec(ctx, sql)
-	return err
+// Migrate applies a named migration exactly once, tracked in schema_migrations.
+func (s *Store) Migrate(ctx context.Context, name, sql string) error {
+	if _, err := s.pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			name TEXT PRIMARY KEY,
+			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`); err != nil {
+		return err
+	}
+	var applied bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = $1)`, name).Scan(&applied); err != nil {
+		return err
+	}
+	if applied {
+		return nil
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, sql); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO schema_migrations (name) VALUES ($1)`, name); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) CreateAgent(ctx context.Context, name, email, categoryHint, description string) (Agent, error) {
@@ -165,22 +190,23 @@ func (s *Store) QueryEvents(ctx context.Context, category string, start, end tim
 	if limit <= 0 || limit > 1000 {
 		limit = 100
 	}
-	q := `SELECT id, agent_id, category, source, timestamp, payload, created_at FROM events WHERE true`
+	q := `SELECT e.id, e.agent_id, c.name, e.source, e.occurred_at, e.normalized_payload, e.created_at
+		FROM events e JOIN categories c ON c.id = e.category_id WHERE true`
 	args := []any{}
 	if category != "" {
 		args = append(args, category)
-		q += fmt.Sprintf(" AND category = $%d", len(args))
+		q += fmt.Sprintf(" AND c.name = $%d", len(args))
 	}
 	if !start.IsZero() {
 		args = append(args, start)
-		q += fmt.Sprintf(" AND timestamp >= $%d", len(args))
+		q += fmt.Sprintf(" AND e.occurred_at >= $%d", len(args))
 	}
 	if !end.IsZero() {
 		args = append(args, end)
-		q += fmt.Sprintf(" AND timestamp <= $%d", len(args))
+		q += fmt.Sprintf(" AND e.occurred_at <= $%d", len(args))
 	}
 	args = append(args, limit)
-	q += fmt.Sprintf(" ORDER BY timestamp DESC LIMIT $%d", len(args))
+	q += fmt.Sprintf(" ORDER BY e.occurred_at DESC LIMIT $%d", len(args))
 
 	rows, err := s.pool.Query(ctx, q, args...)
 	if err != nil {

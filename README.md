@@ -11,8 +11,8 @@ A unified ingestion and observability hub connecting SOAR tooling, dev agents, P
 | Service | Lang | Port | Status |
 |---|---|---|---|
 | `core_api_gateway` | Go (chi) | 8080 | ✅ Phase 1 implemented |
-| `normalizer_router` | Go | 8081 | ⬜ Phase 2 |
-| `schema_registry_service` | Go (chi) | 8082 | ⬜ Phase 2 |
+| `normalizer_router` | Go | 8081 | ✅ Phase 2 implemented |
+| `schema_registry_service` | Go (chi) | 8082 | ✅ Phase 2 implemented |
 | `classifier_agent_service` | Python (FastAPI) | 8083 | ⬜ Phase 3 |
 | `webhook_adapter_service` | Go (chi) | 8084 | ⬜ Phase 3 |
 | React dashboard + Keycloak/Grafana/Loki/Tempo/Mimir infra | — | — | ⬜ Phase 4 |
@@ -47,6 +47,32 @@ curl -s -X POST localhost:8080/v1/collect \
 # 4. MCP discovery + tools
 curl -s localhost:8080/mcp/manifest | jq
 ```
+
+## The core loop (Phase 2)
+
+```
+agent → POST /v1/collect → JetStream ingest → normalizer validates vs registry schema
+  ├─ valid   → routed per routing_yaml (postgres, loki; tempo/mimir via collector in Phase 4)
+  └─ unknown/invalid → quarantine_events + quarantine stream
+        → (Phase 3: classifier proposes schema) → human approves via /v1/proposals/{id}/approve
+        → git commit + new schema version + NATS schema.approved → normalizer auto-replays
+```
+
+Smoke tests: `./scripts/smoke.sh` (Phase 1) and `./scripts/smoke-phase2.sh` (full loop above).
+
+### schema_registry_service (:8082)
+
+- Schemas/categories CRUD with versioning; every create/update/approve is a new version + git commit (ADR-003). Dev runs with `NoopGit` when `GIT_REPO_URL` is unset — Postgres stays the source of truth.
+- Proposals queue: `POST /v1/proposals` (classifier or MCP-proxied), approve/reject with `reviewer_notes`, audit-logged. Approval emits `schema.approved` on the `schema_events` JetStream stream.
+- Agent registry admin CRUD incl. API key metadata.
+- Contract reconciliation: the spec marks `routing_yaml_diff`/`sample_event_ids` required on `POST /v1/proposals`, but the gateway's MCP `propose_schema` tool omits them; the registry treats them as optional so both producers work.
+
+### normalizer_router (:8081)
+
+- Consumes `events.ingest.>` (durable JetStream consumer), validates payloads with gojsonschema against registry schemas (30s TTL cache, last-known fallback per ADR-003).
+- Routes per `routing_yaml` (`target:` or `targets:`): `postgres` (structured events table) and `loki` (push API) implemented; `tempo`/`mimir` deferred to the Phase 4 OTel Collector path (events stay durable in the stream).
+- Quarantines unknown/invalid shapes to Postgres + the `quarantine` stream; subscribes `schema.approved` for automatic replay; manual replay via `/v1/quarantine/{id}/replay` and `/v1/replay/category/{category}`.
+- `/v1/routing-stats` reports throughput, validation failure rate, quarantine rate.
 
 ## Configuration
 

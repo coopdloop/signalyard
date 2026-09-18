@@ -8,12 +8,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
-	"signalyard/internal/coreapi"
+	"signalyard/internal/platform"
+	"signalyard/internal/registry"
 )
 
 func main() {
@@ -24,48 +23,31 @@ func main() {
 }
 
 func run() error {
-	cfg, err := coreapi.LoadConfig()
+	cfg, err := registry.LoadConfig()
 	if err != nil {
 		return err
 	}
 	ctx := context.Background()
 
-	store, err := coreapi.NewStore(ctx, cfg.PostgresDSN)
+	store, err := registry.NewStore(ctx, cfg.PostgresDSN)
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	if cfg.RunMigrations {
-		dir := os.Getenv("MIGRATIONS_DIR")
-		if dir == "" {
-			dir = "migrations"
-		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			return fmt.Errorf("read migrations dir: %w", err)
-		}
-		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
-				continue
-			}
-			sql, err := os.ReadFile(filepath.Join(dir, e.Name()))
-			if err != nil {
-				return fmt.Errorf("read migration %s: %w", e.Name(), err)
-			}
-			if err := store.Migrate(ctx, e.Name(), string(sql)); err != nil {
-				return fmt.Errorf("run migration %s: %w", e.Name(), err)
-			}
-			slog.Info("migration applied", "file", e.Name())
-		}
-	}
-
-	pub, err := coreapi.NewNATSPublisher(ctx, cfg.NATSUrl)
+	gitBackend, err := registry.NewGitCommitter(ctx, cfg)
 	if err != nil {
 		return err
 	}
 
-	srv := coreapi.NewServer(cfg, store, pub)
+	events, err := registry.NewNATSEventPublisher(ctx, cfg.NATSUrl)
+	if err != nil {
+		return err
+	}
+
+	auth := platform.NewTokenAuth(store.Pool(), cfg.HECTokenSalt, cfg.JWTSigningSecret, cfg.DevAdminToken)
+	srv := registry.NewServer(cfg, store, gitBackend, events, auth)
+
 	httpSrv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           srv.Router(),
@@ -74,7 +56,7 @@ func run() error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		slog.Info("core_api_gateway listening", "port", cfg.Port)
+		slog.Info("schema_registry_service listening", "port", cfg.Port)
 		errCh <- httpSrv.ListenAndServe()
 	}()
 

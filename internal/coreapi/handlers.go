@@ -317,7 +317,16 @@ func (s *Server) handleProposeSchema(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "schema registry not configured")
 		return
 	}
-	status, body, err := s.proxyToRegistry(r, http.MethodPost, "/v1/proposals", req)
+	// Translate the MCP tool contract into the registry's proposal contract.
+	agent := agentFrom(r.Context())
+	proposal := map[string]any{
+		"category":          req.Category,
+		"json_schema_patch": req.JSONSchema,
+		"routing_yaml_diff": req.RoutingYAMLDiff,
+		"generated_by":      "mcp-agent:" + agent.Slug,
+		"sample_event_ids":  []string{},
+	}
+	status, body, err := s.proxyToRegistry(r, http.MethodPost, "/v1/proposals", proposal)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "schema registry unreachable")
 		return
