@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
 
 	"signalyard/internal/platform"
 )
@@ -149,7 +150,12 @@ func (s *Server) handleWebhook(tool string) http.HandlerFunc {
 }
 
 func (s *Server) forward(ctx context.Context, category string, normalized []byte) error {
-	_, err := s.js.Publish(ctx, "events.ingest."+category, normalized)
+	subject := "events.ingest." + category
+	ctx, span := otel.Tracer("signalyard/webhook-adapter").Start(ctx, "jetstream publish "+subject)
+	defer span.End()
+	msg := &nats.Msg{Subject: subject, Data: normalized}
+	platform.InjectNATS(ctx, msg)
+	_, err := s.js.PublishMsg(ctx, msg)
 	return err
 }
 

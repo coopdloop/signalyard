@@ -15,7 +15,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/xeipuuv/gojsonschema"
+	"go.opentelemetry.io/otel"
 	"gopkg.in/yaml.v3"
+
+	"signalyard/internal/platform"
 )
 
 // routingConfig is the per-category routing YAML contract:
@@ -120,6 +123,9 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) handleIngest(ctx context.Context, msg jetstream.Msg) error {
+	ctx = platform.ExtractNATS(ctx, msg.Headers())
+	ctx, span := otel.Tracer("signalyard/normalizer-router").Start(ctx, "jetstream process "+msg.Subject())
+	defer span.End()
 	var env Envelope
 	if err := json.Unmarshal(msg.Data(), &env); err != nil {
 		// Unparseable: dead-letter by quarantining the raw bytes, then ack.
@@ -136,6 +142,9 @@ func (w *Worker) handleIngest(ctx context.Context, msg jetstream.Msg) error {
 }
 
 func (w *Worker) handleApproval(ctx context.Context, msg jetstream.Msg) error {
+	ctx = platform.ExtractNATS(ctx, msg.Headers())
+	ctx, span := otel.Tracer("signalyard/normalizer-router").Start(ctx, "jetstream process "+msg.Subject())
+	defer span.End()
 	var ev struct {
 		Category string `json:"category"`
 	}
@@ -166,7 +175,9 @@ func (w *Worker) Process(ctx context.Context, env Envelope) (string, error) {
 		return "", fmt.Errorf("schema lookup: %w", err)
 	}
 
+	_, validateSpan := otel.Tracer("signalyard/normalizer-router").Start(ctx, "validate")
 	valid, err := validatePayload(schema.JSONSchema, env.Payload)
+	validateSpan.End()
 	if err != nil {
 		return "", fmt.Errorf("validate: %w", err)
 	}
@@ -182,7 +193,10 @@ func (w *Worker) Process(ctx context.Context, env Envelope) (string, error) {
 		}
 	}
 	for _, dest := range rc.destinations() {
-		if err := w.route(ctx, dest, env); err != nil {
+		routeCtx, routeSpan := otel.Tracer("signalyard/normalizer-router").Start(ctx, "route "+dest)
+		err := w.route(routeCtx, dest, env)
+		routeSpan.End()
+		if err != nil {
 			return "", fmt.Errorf("route to %s: %w", dest, err)
 		}
 	}

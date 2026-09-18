@@ -13,6 +13,8 @@ import (
 
 	"signalyard/internal/platform"
 	"signalyard/internal/registry"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -28,6 +30,16 @@ func run() error {
 		return err
 	}
 	ctx := context.Background()
+
+	telemetryShutdown, err := platform.SetupTelemetry(ctx, "schema_registry_service")
+	if err != nil {
+		return fmt.Errorf("telemetry: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = telemetryShutdown(shutdownCtx)
+	}()
 
 	store, err := registry.NewStore(ctx, cfg.PostgresDSN)
 	if err != nil {
@@ -50,7 +62,7 @@ func run() error {
 
 	httpSrv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           srv.Router(),
+		Handler:           otelhttp.NewHandler(srv.Router(), "schema_registry_service"),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

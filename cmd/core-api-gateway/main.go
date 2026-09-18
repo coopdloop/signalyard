@@ -14,6 +14,9 @@ import (
 	"time"
 
 	"signalyard/internal/coreapi"
+	"signalyard/internal/platform"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -29,6 +32,16 @@ func run() error {
 		return err
 	}
 	ctx := context.Background()
+
+	telemetryShutdown, err := platform.SetupTelemetry(ctx, "core_api_gateway")
+	if err != nil {
+		return fmt.Errorf("telemetry: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = telemetryShutdown(shutdownCtx)
+	}()
 
 	store, err := coreapi.NewStore(ctx, cfg.PostgresDSN)
 	if err != nil {
@@ -68,7 +81,7 @@ func run() error {
 	srv := coreapi.NewServer(cfg, store, pub)
 	httpSrv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           srv.Router(),
+		Handler:           otelhttp.NewHandler(srv.Router(), "core_api_gateway"),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

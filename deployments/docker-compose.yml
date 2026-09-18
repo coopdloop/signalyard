@@ -37,6 +37,7 @@ services:
       dockerfile: deployments/Dockerfile.core-api-gateway
     environment:
       PORT: "8080"
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
       POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
       NATS_URL: nats://nats:4222
       JWT_SIGNING_SECRET: dev-jwt-secret-change-me
@@ -67,6 +68,7 @@ services:
       dockerfile: deployments/Dockerfile.schema-registry
     environment:
       PORT: "8082"
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
       POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
       NATS_URL: nats://nats:4222
       HEC_TOKEN_SALT: dev-hec-salt-change-me
@@ -87,6 +89,7 @@ services:
       dockerfile: deployments/Dockerfile.normalizer-router
     environment:
       PORT: "8081"
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
       POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
       NATS_URL: nats://nats:4222
       SCHEMA_REGISTRY_URL: http://schema-registry:8082
@@ -111,6 +114,7 @@ services:
       dockerfile: deployments/Dockerfile.webhook-adapter
     environment:
       PORT: "8084"
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
       POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
       NATS_URL: nats://nats:4222
       GITHUB_WEBHOOK_SECRET: dev-github-secret

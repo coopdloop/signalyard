@@ -13,6 +13,8 @@ import (
 
 	"signalyard/internal/normalizer"
 	"signalyard/internal/platform"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -29,6 +31,16 @@ func run() error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	telemetryShutdown, err := platform.SetupTelemetry(ctx, "normalizer_router")
+	if err != nil {
+		return fmt.Errorf("telemetry: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = telemetryShutdown(shutdownCtx)
+	}()
 
 	store, err := normalizer.NewStore(ctx, cfg.PostgresDSN)
 	if err != nil {
@@ -47,7 +59,7 @@ func run() error {
 
 	httpSrv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           srv.Router(),
+		Handler:           otelhttp.NewHandler(srv.Router(), "normalizer_router"),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

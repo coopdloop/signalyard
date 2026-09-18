@@ -9,6 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"go.opentelemetry.io/otel"
+
+	"signalyard/internal/platform"
 )
 
 // SchemaEventsStream carries schema lifecycle events for the normalizer (ADR-002/003).
@@ -58,6 +61,10 @@ func (p *NATSEventPublisher) PublishSchemaApproved(ctx context.Context, ev Schem
 	if err != nil {
 		return err
 	}
-	_, err = p.js.Publish(ctx, SubjectSchemaApproved, data)
+	ctx, span := otel.Tracer("signalyard/schema-registry").Start(ctx, "jetstream publish "+SubjectSchemaApproved)
+	defer span.End()
+	msg := &nats.Msg{Subject: SubjectSchemaApproved, Data: data}
+	platform.InjectNATS(ctx, msg)
+	_, err = p.js.PublishMsg(ctx, msg)
 	return err
 }

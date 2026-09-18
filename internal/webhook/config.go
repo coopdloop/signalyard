@@ -8,16 +8,16 @@ import (
 
 // Config for webhook_adapter_service. Names match docs/product.json.
 type Config struct {
-	Port                    int    // PORT (default 8084)
-	NATSUrl                 string // NATS_URL (required)
-	PostgresDSN             string // POSTGRES_DSN (required: delivery tracking; spec's db_schema owns these tables)
-	GitHubWebhookSecret     string // GITHUB_WEBHOOK_SECRET
-	JiraWebhookSecret       string // JIRA_WEBHOOK_SECRET
-	PagerDutyWebhookSecret  string // PAGERDUTY_WEBHOOK_SECRET
-	MarbleJarWebhookSecret  string // MARBLE_JAR_WEBHOOK_SECRET
-	HECTokenSalt            string // HEC_TOKEN_SALT (auth for the deliveries API)
-	JWTSigningSecret        string // JWT_SIGNING_SECRET
-	DevAdminToken           string // DEV_ADMIN_TOKEN (dev only)
+	Port                   int    // PORT (default 8084)
+	NATSUrl                string // NATS_URL (required)
+	PostgresDSN            string // POSTGRES_DSN (required: delivery tracking; spec's db_schema owns these tables)
+	GitHubWebhookSecret    string // GITHUB_WEBHOOK_SECRET
+	JiraWebhookSecret      string // JIRA_WEBHOOK_SECRET
+	PagerDutyWebhookSecret string // PAGERDUTY_WEBHOOK_SECRET
+	MarbleJarWebhookSecret string // MARBLE_JAR_WEBHOOK_SECRET
+	HECTokenSalt           string // HEC_TOKEN_SALT (auth for the deliveries API)
+	JWTSigningSecret       string // JWT_SIGNING_SECRET
+	DevAdminToken          string // DEV_ADMIN_TOKEN (dev only)
 }
 
 func LoadConfig() (*Config, error) {
