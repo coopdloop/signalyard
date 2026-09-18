@@ -36,6 +36,8 @@ export const api = {
   listAgents: () => call(REGISTRY_URL, '/v1/agents'),
   getAgent: (id) => call(REGISTRY_URL, `/v1/agents/${id}`),
 
+  listAuditLog: (proposalId) => call(REGISTRY_URL, `/v1/audit-log${proposalId ? `?proposal_id=${proposalId}` : ''}`),
+
   // normalizer
   routingStats: () => call(NORMALIZER_URL, '/v1/routing-stats'),
   listQuarantine: () => call(NORMALIZER_URL, '/v1/quarantine'),

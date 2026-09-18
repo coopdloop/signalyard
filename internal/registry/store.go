@@ -316,6 +316,44 @@ func (s *Store) FinalizeProposal(ctx context.Context, id uuid.UUID, status, revi
 	return nil
 }
 
+type AuditEntry struct {
+	ID         uuid.UUID  `json:"id"`
+	ProposalID uuid.UUID  `json:"proposal_id"`
+	Category   string     `json:"category"`
+	UserID     *uuid.UUID `json:"user_id"`
+	Action     string     `json:"action"`
+	Notes      string     `json:"notes"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// ListAuditLog returns approval audit entries, newest first (max 200).
+func (s *Store) ListAuditLog(ctx context.Context, proposalID *uuid.UUID) ([]AuditEntry, error) {
+	q := `SELECT a.id, a.proposal_id, COALESCE(p.proposed_category_name, ''), a.user_id,
+			a.action, COALESCE(a.notes, ''), a.created_at
+		FROM approval_audit_log a
+		LEFT JOIN schema_proposals p ON p.id = a.proposal_id`
+	args := []any{}
+	if proposalID != nil {
+		args = append(args, *proposalID)
+		q += ` WHERE a.proposal_id = $1`
+	}
+	q += ` ORDER BY a.created_at DESC LIMIT 200`
+	rows, err := s.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []AuditEntry{}
+	for rows.Next() {
+		var e AuditEntry
+		if err := rows.Scan(&e.ID, &e.ProposalID, &e.Category, &e.UserID, &e.Action, &e.Notes, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) AuditLog(ctx context.Context, proposalID uuid.UUID, userID *uuid.UUID, action, notes string) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO approval_audit_log (proposal_id, user_id, action, notes) VALUES ($1, $2, $3, $4)`,

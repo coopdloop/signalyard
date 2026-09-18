@@ -49,9 +49,9 @@ func IdentityFrom(ctx context.Context) Identity {
 // TokenAuth validates HEC-style machine API keys (hashed into the shared
 // api_keys table) and human session JWTs, plus an optional static dev token.
 type TokenAuth struct {
-	pool         *pgxpool.Pool
-	hecSalt      string
-	jwtSecret    string
+	pool          *pgxpool.Pool
+	hecSalt       string
+	jwtSecret     string
 	devAdminToken string
 }
 
@@ -110,6 +110,26 @@ func (a *TokenAuth) Resolve(ctx context.Context, token string) (Identity, error)
 		}
 	}
 	return Identity{}, errors.New("invalid token")
+}
+
+// RequireRole allows identities whose Role is in the allowed set; dev-admin
+// always passes. Machine tokens carry no role, so they are rejected here and
+// must use role-free routes. Must run after TokenAuth.Middleware.
+func RequireRole(roles ...string) func(http.Handler) http.Handler {
+	allowed := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		allowed[r] = true
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			id := IdentityFrom(r.Context())
+			if id.Kind == "dev-admin" || allowed[id.Role] {
+				next.ServeHTTP(w, r)
+				return
+			}
+			WriteError(w, http.StatusForbidden, "forbidden")
+		})
+	}
 }
 
 func (a *TokenAuth) Middleware(next http.Handler) http.Handler {

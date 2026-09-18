@@ -9,6 +9,7 @@ import SchemaRegistry from './pages/SchemaRegistry'
 import Agents from './pages/Agents'
 import Onboarding from './pages/Onboarding'
 import Settings from './pages/Settings'
+import AuditLog from './pages/AuditLog'
 
 function Guard({ children }) {
   const token = useSession((s) => s.token)
@@ -30,6 +31,7 @@ function Shell({ children }) {
           <NavLink to="/schema-registry">Schema Registry</NavLink>
           <NavLink to="/agents">Agents</NavLink>
           <NavLink to="/start-here-agents">Onboarding</NavLink>
+          <NavLink to="/audit-log">Audit Log</NavLink>
           <NavLink to="/settings">Settings</NavLink>
         </nav>
         <div className="sidebar-footer">
@@ -53,6 +55,7 @@ export default function App() {
       <Route path="/schema-registry" element={<Guard><Shell><SchemaRegistry /></Shell></Guard>} />
       <Route path="/agents" element={<Guard><Shell><Agents /></Shell></Guard>} />
       <Route path="/start-here-agents" element={<Guard><Shell><Onboarding /></Shell></Guard>} />
+      <Route path="/audit-log" element={<Guard><Shell><AuditLog /></Shell></Guard>} />
       <Route path="/settings" element={<Guard><Shell><Settings /></Shell></Guard>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

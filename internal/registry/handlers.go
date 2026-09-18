@@ -13,11 +13,11 @@ import (
 )
 
 type Server struct {
-	cfg   *Config
-	store *Store
-	git   GitCommitter
+	cfg    *Config
+	store  *Store
+	git    GitCommitter
 	events EventPublisher
-	auth  *platform.TokenAuth
+	auth   *platform.TokenAuth
 }
 
 func NewServer(cfg *Config, store *Store, git GitCommitter, events EventPublisher, auth *platform.TokenAuth) *Server {
@@ -400,4 +400,24 @@ func (s *Server) handleDeleteAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	platform.WriteJSON(w, http.StatusOK, map[string]any{"agent_id": id.String(), "deleted": true})
+}
+
+// --- audit log ---
+
+func (s *Server) handleListAuditLog(w http.ResponseWriter, r *http.Request) {
+	var proposalID *uuid.UUID
+	if v := r.URL.Query().Get("proposal_id"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			platform.WriteError(w, http.StatusBadRequest, "invalid proposal_id")
+			return
+		}
+		proposalID = &parsed
+	}
+	entries, err := s.store.ListAuditLog(r.Context(), proposalID)
+	if err != nil {
+		platform.WriteError(w, http.StatusInternalServerError, "list failed")
+		return
+	}
+	platform.WriteJSON(w, http.StatusOK, map[string]any{"entries": entries})
 }

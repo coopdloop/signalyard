@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,5 +51,37 @@ func TestResolveDevAdmin(t *testing.T) {
 	}
 	if id.Kind != "dev-admin" || id.Role != "admin" {
 		t.Fatalf("unexpected identity %+v", id)
+	}
+}
+
+func TestRequireRole(t *testing.T) {
+	cases := []struct {
+		name     string
+		identity Identity
+		allowed  []string
+		want     int
+	}{
+		{"admin allowed", Identity{Kind: "user", Role: "admin"}, []string{"admin", "approver"}, http.StatusOK},
+		{"approver allowed", Identity{Kind: "user", Role: "approver"}, []string{"admin", "approver"}, http.StatusOK},
+		{"viewer rejected", Identity{Kind: "user", Role: "viewer"}, []string{"admin", "approver"}, http.StatusForbidden},
+		{"dev-admin bypass", Identity{Kind: "dev-admin", Role: "admin"}, []string{"admin"}, http.StatusOK},
+		{"agent token rejected", Identity{Kind: "agent"}, []string{"admin", "approver"}, http.StatusForbidden},
+		{"no identity rejected", Identity{}, []string{"admin"}, http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			h := RequireRole(tc.allowed...)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
+			r := httptest.NewRequest(http.MethodPost, "/", nil)
+			r = r.WithContext(context.WithValue(r.Context(), ctxIdentity, tc.identity))
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, r)
+			if w.Code != tc.want {
+				t.Fatalf("got %d want %d", w.Code, tc.want)
+			}
+			if want := tc.want == http.StatusOK; called != want {
+				t.Fatalf("handler called=%v want %v", called, want)
+			}
+		})
 	}
 }
