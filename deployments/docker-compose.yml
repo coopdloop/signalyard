@@ -98,6 +98,55 @@ services:
       schema-registry:
         condition: service_started
 
+  webhook-adapter:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.webhook-adapter
+    environment:
+      PORT: "8084"
+      POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
+      NATS_URL: nats://nats:4222
+      GITHUB_WEBHOOK_SECRET: dev-github-secret
+      JIRA_WEBHOOK_SECRET: dev-jira-secret
+      PAGERDUTY_WEBHOOK_SECRET: dev-pagerduty-secret
+      MARBLE_JAR_WEBHOOK_SECRET: dev-marble-jar-secret
+      HEC_TOKEN_SALT: dev-hec-salt-change-me
+      JWT_SIGNING_SECRET: dev-jwt-secret-change-me
+      DEV_ADMIN_TOKEN: dev-admin-token
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+  classifier:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.classifier
+    environment:
+      PORT: "8083"
+      NATS_URL: nats://nats:4222
+      SCHEMA_REGISTRY_URL: http://schema-registry:8082
+      SCHEMA_REGISTRY_TOKEN: dev-admin-token
+      POSTGRES_DSN: postgres://signalyard:signalyard@postgres:5432/signalyard
+      LLM_PROVIDER: heuristic
+      # ANTHROPIC_API_KEY / OPENAI_API_KEY / OLLAMA_BASE_URL: set to use a real LLM backend
+      HEC_TOKEN_SALT: dev-hec-salt-change-me
+      JWT_SIGNING_SECRET: dev-jwt-secret-change-me
+      DEV_ADMIN_TOKEN: dev-admin-token
+      CLUSTER_THRESHOLD: "3"
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      schema-registry:
+        condition: service_started
+
 volumes:
   pgdata:
   natsdata:

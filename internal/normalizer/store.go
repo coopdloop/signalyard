@@ -79,15 +79,24 @@ func (s *Store) InsertEvent(ctx context.Context, env Envelope) error {
 }
 
 // Quarantine records an event that failed validation or has no known schema.
+// The row id is the envelope's event_id so downstream consumers (classifier,
+// proposals, classifier_runs) can join back to it. Idempotent: a re-quarantined
+// event (e.g. failed replay) bumps attempts instead of erroring.
 func (s *Store) Quarantine(ctx context.Context, env Envelope, reason string) error {
 	var agentID *uuid.UUID
 	if parsed, err := uuid.Parse(env.AgentID); err == nil {
 		agentID = &parsed
 	}
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO quarantine_events (agent_id, source, raw_payload, reason, status)
-		VALUES ($1, $2, $3, $4, 'pending')`,
-		agentID, env.Source, env, reason)
+	id, err := uuid.Parse(env.EventID)
+	if err != nil {
+		id = uuid.New()
+	}
+	_, err = s.pool.Exec(ctx, `
+		INSERT INTO quarantine_events (id, agent_id, source, raw_payload, reason, status)
+		VALUES ($1, $2, $3, $4, $5, 'pending')
+		ON CONFLICT (id) DO UPDATE SET attempts = quarantine_events.attempts + 1,
+			reason = EXCLUDED.reason, updated_at = NOW()`,
+		id, agentID, env.Source, env, reason)
 	return err
 }
 

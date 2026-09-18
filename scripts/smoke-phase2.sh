@@ -11,6 +11,12 @@ NORM="${NORMALIZER_URL:-http://localhost:8081}"
 ADMIN="${DEV_ADMIN_TOKEN:-dev-admin-token}"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
+# Reset pipeline state so reruns are deterministic (dev DB only).
+if [ "${SMOKE_RESET:-1}" = "1" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -q signalyard-postgres; then
+  docker exec signalyard-postgres-1 psql -U signalyard -q -c \
+    "TRUNCATE events, quarantine_events, schema_proposals, approval_audit_log, classifier_runs, schemas, categories CASCADE" || true
+fi
+
 echo "== service health =="
 curl -sf "$REG/health" | grep -q ok || fail "registry health"
 curl -sf "$NORM/health" | grep -q ok || fail "normalizer health"

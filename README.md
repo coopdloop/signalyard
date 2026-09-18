@@ -13,8 +13,8 @@ A unified ingestion and observability hub connecting SOAR tooling, dev agents, P
 | `core_api_gateway` | Go (chi) | 8080 | ✅ Phase 1 implemented |
 | `normalizer_router` | Go | 8081 | ✅ Phase 2 implemented |
 | `schema_registry_service` | Go (chi) | 8082 | ✅ Phase 2 implemented |
-| `classifier_agent_service` | Python (FastAPI) | 8083 | ⬜ Phase 3 |
-| `webhook_adapter_service` | Go (chi) | 8084 | ⬜ Phase 3 |
+| `classifier_agent_service` | Python (FastAPI) | 8083 | ✅ Phase 3 implemented |
+| `webhook_adapter_service` | Go (chi) | 8084 | ✅ Phase 3 implemented |
 | React dashboard + Keycloak/Grafana/Loki/Tempo/Mimir infra | — | — | ⬜ Phase 4 |
 
 ## Quickstart (dev)
@@ -58,7 +58,7 @@ agent → POST /v1/collect → JetStream ingest → normalizer validates vs regi
         → git commit + new schema version + NATS schema.approved → normalizer auto-replays
 ```
 
-Smoke tests: `./scripts/smoke.sh` (Phase 1) and `./scripts/smoke-phase2.sh` (full loop above).
+Smoke tests: `./scripts/smoke.sh` (Phase 1), `./scripts/smoke-phase2.sh` (registry/normalizer loop), `./scripts/smoke-phase3.sh` (webhooks + classifier: the full autonomous loop).
 
 ### schema_registry_service (:8082)
 
@@ -66,6 +66,20 @@ Smoke tests: `./scripts/smoke.sh` (Phase 1) and `./scripts/smoke-phase2.sh` (ful
 - Proposals queue: `POST /v1/proposals` (classifier or MCP-proxied), approve/reject with `reviewer_notes`, audit-logged. Approval emits `schema.approved` on the `schema_events` JetStream stream.
 - Agent registry admin CRUD incl. API key metadata.
 - Contract reconciliation: the spec marks `routing_yaml_diff`/`sample_event_ids` required on `POST /v1/proposals`, but the gateway's MCP `propose_schema` tool omits them; the registry treats them as optional so both producers work.
+
+### webhook_adapter_service (:8084)
+
+- Dedicated receivers for GitHub (`X-Hub-Signature-256`), PagerDuty (`X-PagerDuty-Signature`), Jira and marble-jar (`X-SignalYard-Signature` HMAC). Unset secrets fail closed.
+- Normalizes each tool's payload into the common envelope and publishes to `events.ingest.<category>` — from there the standard validate/route/quarantine pipeline takes over, so new tools need no pipeline code.
+- Deliveries tracked in Postgres (`webhook_sources`/`webhook_deliveries`); forward failures dead-letter to the `webhooks` stream; manual retry via `/v1/webhook-deliveries/{id}/retry`.
+- Deviation: `POSTGRES_DSN` added to this service's env (the spec's db_schema owns the webhook tables but its env list omitted the DSN).
+
+### classifier_agent_service (:8083, Python/FastAPI)
+
+- Durable JetStream consumer on the `quarantine` stream; clusters payloads by shape fingerprint (category + sorted field types) to avoid duplicate proposals.
+- At `CLUSTER_THRESHOLD` (default 3) same-shape events, auto-classifies and submits a schema proposal to the registry; manual batches via `POST /v1/classification-jobs`.
+- Pluggable backends (`GET/PUT /v1/llm-backends`): `anthropic`, `openai`, `ollama`, plus `heuristic` (local schema inference, dev default — the full loop works with no LLM key). LLM calls go over httpx directly rather than langchain/instructor to keep the image lean; structured output via prompt + tolerant JSON parsing.
+- LLM runs recorded in `classifier_runs` when `POSTGRES_DSN` is set.
 
 ### normalizer_router (:8081)
 

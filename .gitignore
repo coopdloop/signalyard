@@ -4,3 +4,6 @@
 *.local
 .DS_Store
 .pi/
+.venv/
+__pycache__/
+.pytest_cache/

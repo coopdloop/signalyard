@@ -28,10 +28,11 @@ Single Go binary: public API + MCP server + auth + JetStream publishing.
 - [x] Full-loop E2E (`scripts/smoke-phase2.sh`): unknown → quarantine → proposal → approve → auto-replay → queryable
 - [ ] Compose: add loki, tempo, mimir, grafana (moved to Phase 4 with dashboards)
 
-## Phase 3 — Webhook Adapter + Classifier Agent
+## Phase 3 — Webhook Adapter + Classifier Agent ✅
 
-- [ ] `webhook_adapter_service` (Go/chi, :8084): `/webhooks/{github,jira,pagerduty,marble-jar}` with per-tool signature verification, envelope normalization, delivery tracking + retry endpoints
-- [ ] `classifier_agent_service` (Python/FastAPI, :8083): consume quarantine stream, cluster similar payloads, LLM classification (Anthropic/OpenAI/Ollama backends), submit proposals to registry, classification-jobs/clusters/llm-backends endpoints
+- [x] `webhook_adapter_service` (Go/chi, :8084): `/webhooks/{github,jira,pagerduty,marble-jar}` with per-tool HMAC signature verification (fail-closed), envelope normalization into `events.ingest.<category>`, delivery tracking, dead-letter stream, retry endpoint
+- [x] `classifier_agent_service` (Python/FastAPI, :8083): durable quarantine consumer, shape-fingerprint clustering, auto-proposal at threshold, manual classification jobs, pluggable LLM backends (anthropic/openai/ollama/heuristic) with runtime switching, `classifier_runs` recording, Prometheus metrics
+- [x] Full autonomous loop E2E (`scripts/smoke-phase3.sh`): webhook → quarantine → cluster → auto-proposal → human approve → replay → queryable
 
 ## Phase 4 — Human Surface + Production Infra
 

@@ -307,7 +307,8 @@ func (w *Worker) ReplayOne(ctx context.Context, q QuarantineEvent) (bool, error)
 		w.counts.replayed.Add(1)
 		return true, w.store.MarkReplayed(ctx, q.EventID)
 	}
-	return false, w.store.BumpAttempts(ctx, q.EventID, "replay: still failing validation")
+	// Process already re-quarantined (attempts bumped via upsert).
+	return false, nil
 }
 
 func (w *Worker) Stats() (throughput, validationFailureRate, quarantineRate float64) {
