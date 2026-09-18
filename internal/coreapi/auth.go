@@ -64,11 +64,22 @@ func (s *Server) RequireAPIKey(next http.Handler) http.Handler {
 			return
 		}
 		key, err := s.store.GetAPIKeyByHash(r.Context(), HashAPIKey(s.cfg.HECTokenSalt, token))
-		if err != nil {
-			if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, ErrNotFound) {
+			// Not an API key: try a short-lived agent JWT from POST /v1/tokens.
+			agentID, jwtErr := s.parseAgentToken(token)
+			if jwtErr != nil {
 				writeError(w, http.StatusUnauthorized, "invalid token")
 				return
 			}
+			agent, err := s.store.GetAgent(r.Context(), agentID)
+			if err != nil {
+				writeError(w, http.StatusUnauthorized, "agent not found for token")
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxAgent, agent)))
+			return
+		}
+		if err != nil {
 			writeError(w, http.StatusInternalServerError, "auth lookup failed")
 			return
 		}
@@ -90,6 +101,29 @@ func (s *Server) RequireAPIKey(next http.Handler) http.Handler {
 func agentFrom(ctx context.Context) Agent {
 	a, _ := ctx.Value(ctxAgent).(Agent)
 	return a
+}
+
+func userFrom(ctx context.Context) User {
+	u, _ := ctx.Value(ctxUser).(User)
+	return u
+}
+
+// RequireRole gates session-authed routes to specific human roles
+// (403 otherwise). Must run after RequireSession.
+func RequireRole(roles ...string) func(http.Handler) http.Handler {
+	allowed := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		allowed[r] = true
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !allowed[userFrom(r.Context()).Role] {
+				writeError(w, http.StatusForbidden, "forbidden")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // RequireSession enforces human auth for dashboard-style management routes
@@ -161,6 +195,38 @@ func (s *Server) issueSessionToken(u User) (string, time.Time, error) {
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(s.cfg.JWTSigningSecret))
 	return token, expires, err
+}
+
+// issueAgentToken signs a short-lived JWT for a machine agent (POST /v1/tokens).
+func (s *Server) issueAgentToken(agentID uuid.UUID, ttl time.Duration) (string, time.Time, error) {
+	expires := time.Now().Add(ttl)
+	claims := jwt.MapClaims{
+		"sub":  agentID.String(),
+		"kind": "agent",
+		"exp":  expires.Unix(),
+		"iat":  time.Now().Unix(),
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(s.cfg.JWTSigningSecret))
+	return token, expires, err
+}
+
+// parseAgentToken verifies an agent JWT and returns the agent id.
+func (s *Server) parseAgentToken(token string) (uuid.UUID, error) {
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(s.cfg.JWTSigningSecret), nil
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if kind, _ := claims["kind"].(string); kind != "agent" {
+		return uuid.Nil, errors.New("not an agent token")
+	}
+	sub, _ := claims["sub"].(string)
+	return uuid.Parse(sub)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

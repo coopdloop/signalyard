@@ -1,0 +1,439 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Signal Yard core_api_gateway",
+    "version": "0.4.0",
+    "description": "Public API gateway and MCP server for Signal Yard: agent self-onboarding, generic event ingestion, OTLP passthrough, MCP tools, and API key/JWT issuance."
+  },
+  "servers": [{"url": "http://localhost:8080"}],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Health check endpoint",
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/StatusResponse"}}}
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Prometheus metrics scrape endpoint",
+        "responses": {
+          "200": {
+            "description": "Prometheus formatted metrics",
+            "content": {"text/plain": {"schema": {"type": "string"}}}
+          }
+        }
+      }
+    },
+    "/start-here-agents": {
+      "get": {
+        "tags": ["onboarding"],
+        "summary": "Self-onboarding manifest for agents: capability manifest, OpenAPI/JSON Schema, MCP manifest, key request instructions, example payloads",
+        "responses": {
+          "200": {
+            "description": "Onboarding manifest",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {
+                "capability_manifest": {"type": "object"},
+                "openapi_url": {"type": "string"},
+                "mcp_manifest": {"type": "object"},
+                "api_key_instructions": {"type": "string"},
+                "example_payloads": {"type": "object"}
+              }
+            }}}
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["onboarding"],
+        "summary": "This OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.0 specification",
+            "content": {"application/json": {"schema": {"type": "object"}}}
+          }
+        }
+      }
+    },
+    "/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register a new agent and request initial credentials",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object",
+          "required": ["agent_name", "contact_email"],
+          "properties": {
+            "agent_name": {"type": "string"},
+            "contact_email": {"type": "string"},
+            "category_hint": {"type": "string"},
+            "description": {"type": "string"}
+          }
+        }}}},
+        "responses": {
+          "201": {
+            "description": "Agent registered, pending key issuance",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {"agent_id": {"type": "string"}, "status": {"type": "string"}}
+            }}}
+          },
+          "400": {"description": "Invalid registration payload", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Exchange OIDC credentials/token for a dashboard session token",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object",
+          "required": ["oidc_token"],
+          "properties": {"oidc_token": {"type": "string"}}
+        }}}},
+        "responses": {
+          "200": {
+            "description": "Session token issued",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {
+                "session_token": {"type": "string"},
+                "expires_at": {"type": "string", "format": "date-time"}
+              }
+            }}}
+          },
+          "401": {"description": "Invalid OIDC token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/v1/api-keys": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Issue a new API key/JWT for an approved agent (admin/approver role)",
+        "security": [{"sessionAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object",
+          "required": ["agent_id"],
+          "properties": {
+            "agent_id": {"type": "string"},
+            "label": {"type": "string"},
+            "scopes": {"type": "array", "items": {"type": "string"}}
+          }
+        }}}},
+        "responses": {
+          "201": {
+            "description": "API key issued",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {
+                "api_key": {"type": "string"},
+                "key_id": {"type": "string"},
+                "agent_id": {"type": "string"},
+                "issued_at": {"type": "string", "format": "date-time"}
+              }
+            }}}
+          },
+          "400": {"description": "Invalid request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "403": {"description": "Forbidden: requires admin or approver role", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/v1/api-keys/{key_id}": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Get metadata about an issued API key",
+        "security": [{"sessionAuth": []}],
+        "parameters": [{"name": "key_id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {
+            "description": "API key metadata",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {
+                "key_id": {"type": "string"},
+                "agent_id": {"type": "string"},
+                "key_prefix": {"type": "string"},
+                "scopes": {"type": "array", "items": {"type": "string"}},
+                "created_at": {"type": "string", "format": "date-time"},
+                "revoked": {"type": "boolean"}
+              }
+            }}}
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Key not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      },
+      "delete": {
+        "tags": ["auth"],
+        "summary": "Revoke an API key (admin/approver role)",
+        "security": [{"sessionAuth": []}],
+        "parameters": [{"name": "key_id", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {
+            "description": "Key revoked",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {"key_id": {"type": "string"}, "revoked": {"type": "boolean"}}
+            }}}
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "403": {"description": "Forbidden: requires admin or approver role", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Key not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/v1/tokens": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Exchange an API key for a short-lived agent JWT",
+        "security": [{"hecAuth": []}],
+        "requestBody": {"required": false, "content": {"application/json": {"schema": {
+          "type": "object",
+          "properties": {"ttl_seconds": {"type": "integer", "default": 3600, "maximum": 86400}}
+        }}}},
+        "responses": {
+          "201": {
+            "description": "Agent JWT issued",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {
+                "token": {"type": "string"},
+                "expires_at": {"type": "string", "format": "date-time"}
+              }
+            }}}
+          },
+          "400": {"description": "Invalid ttl_seconds", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/v1/collect": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "Generic JSON event intake (HEC-style token auth)",
+        "security": [{"hecAuth": []}],
+        "parameters": [{"name": "Idempotency-Key", "in": "header", "required": false, "schema": {"type": "string"}, "description": "Duplicate submissions with the same key return the original response with status 200"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EventEnvelope"}}}},
+        "responses": {
+          "201": {
+            "description": "Event accepted and queued",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AcceptedResponse"}}}
+          },
+          "200": {
+            "description": "Duplicate Idempotency-Key: original response replayed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AcceptedResponse"}}}
+          },
+          "400": {"description": "Malformed event payload", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Invalid or missing token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/v1/otlp/traces": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "OTLP traces ingestion passthrough endpoint",
+        "security": [{"hecAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "description": "OTLP ExportTraceServiceRequest protobuf/JSON payload"}}}},
+        "responses": {
+          "201": {"description": "Traces accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/StatusResponse"}}}},
+          "400": {"description": "Invalid OTLP payload", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/v1/otlp/metrics": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "OTLP metrics ingestion passthrough endpoint",
+        "security": [{"hecAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "description": "OTLP ExportMetricsServiceRequest protobuf/JSON payload"}}}},
+        "responses": {
+          "201": {"description": "Metrics accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/StatusResponse"}}}},
+          "400": {"description": "Invalid OTLP payload", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/v1/otlp/logs": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "OTLP logs ingestion passthrough endpoint",
+        "security": [{"hecAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "description": "OTLP ExportLogsServiceRequest protobuf/JSON payload"}}}},
+        "responses": {
+          "201": {"description": "Logs accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/StatusResponse"}}}},
+          "400": {"description": "Invalid OTLP payload", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/mcp/manifest": {
+      "get": {
+        "tags": ["mcp"],
+        "summary": "Return the MCP tool server manifest for discovery",
+        "responses": {
+          "200": {
+            "description": "MCP manifest",
+            "content": {"application/json": {"schema": {"type": "object"}}}
+          }
+        }
+      }
+    },
+    "/mcp/tools/ingest_event": {
+      "post": {
+        "tags": ["mcp"],
+        "summary": "MCP tool endpoint: ingest an event via MCP protocol",
+        "security": [{"hecAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EventEnvelope"}}}},
+        "responses": {
+          "201": {"description": "Event accepted", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AcceptedResponse"}}}},
+          "400": {"description": "Malformed event payload", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Rate limit exceeded", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/mcp/tools/query_events": {
+      "post": {
+        "tags": ["mcp"],
+        "summary": "MCP tool endpoint: query stored events",
+        "security": [{"hecAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object",
+          "properties": {
+            "category": {"type": "string"},
+            "start_time": {"type": "string", "format": "date-time"},
+            "end_time": {"type": "string", "format": "date-time"},
+            "limit": {"type": "integer"}
+          }
+        }}}},
+        "responses": {
+          "200": {
+            "description": "Matching events",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {"events": {"type": "array", "items": {"type": "object"}}}
+            }}}
+          },
+          "400": {"description": "Invalid query", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/mcp/tools/propose_schema": {
+      "post": {
+        "tags": ["mcp"],
+        "summary": "MCP tool endpoint: submit a schema proposal",
+        "security": [{"hecAuth": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object",
+          "required": ["category", "json_schema"],
+          "properties": {
+            "category": {"type": "string"},
+            "json_schema": {"type": "object"},
+            "routing_yaml_diff": {"type": "string"}
+          }
+        }}}},
+        "responses": {
+          "201": {
+            "description": "Proposal submitted",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {"proposal_id": {"type": "string"}, "status": {"type": "string"}}
+            }}}
+          },
+          "400": {"description": "Invalid proposal payload", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/mcp/tools/list_categories": {
+      "post": {
+        "tags": ["mcp"],
+        "summary": "MCP tool endpoint: list known event categories",
+        "security": [{"hecAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Known categories",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {"categories": {"type": "array", "items": {"type": "object"}}}
+            }}}
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    },
+    "/mcp/tools/get_manifest": {
+      "post": {
+        "tags": ["mcp"],
+        "summary": "MCP tool endpoint: return capability/MCP manifest",
+        "security": [{"hecAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Capability and MCP manifests",
+            "content": {"application/json": {"schema": {
+              "type": "object",
+              "properties": {
+                "capability_manifest": {"type": "object"},
+                "mcp_manifest": {"type": "object"}
+              }
+            }}}
+          },
+          "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "hecAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "HEC-style machine token: 'Authorization: SignalYard <api_key>' (Splunk/Bearer schemes also accepted), or a short-lived agent JWT from POST /v1/tokens"
+      },
+      "sessionAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Human session JWT from POST /login"
+      }
+    },
+    "schemas": {
+      "StatusResponse": {
+        "type": "object",
+        "properties": {"status": {"type": "string"}}
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {"error": {"type": "string"}}
+      },
+      "AcceptedResponse": {
+        "type": "object",
+        "properties": {
+          "event_id": {"type": "string"},
+          "status": {"type": "string"}
+        }
+      },
+      "EventEnvelope": {
+        "type": "object",
+        "required": ["category", "timestamp", "payload"],
+        "properties": {
+          "category": {"type": "string"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "payload": {"type": "object"},
+          "source": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -5,8 +5,8 @@ package coreapi
 
 func capabilityManifest() map[string]any {
 	return map[string]any{
-		"service":  "signal-yard core_api_gateway",
-		"version":  "0.1.0",
+		"service":   "signal-yard core_api_gateway",
+		"version":   "0.1.0",
 		"protocols": []string{"rest-json", "otlp-http", "mcp"},
 		"ingestion": map[string]any{
 			"generic_events": map[string]any{
@@ -104,5 +104,6 @@ func apiKeyInstructions() string {
 	return `1. POST /register with {"agent_name": "...", "contact_email": "..."} to register (no auth required).
 2. A human approver approves your registration and issues an API key via POST /v1/api-keys.
 3. Send events to POST /v1/collect with header "Authorization: SignalYard <api_key>".
-4. Unknown payload shapes are quarantined and classified; a human reviews the proposed schema before it goes live.`
+4. Optional: exchange the API key for a short-lived JWT via POST /v1/tokens (body {"ttl_seconds": 3600}) and use it as "Authorization: Bearer <token>" instead of the long-lived key.
+5. Unknown payload shapes are quarantined and classified; a human reviews the proposed schema before it goes live.`
 }

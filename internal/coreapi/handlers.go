@@ -25,11 +25,11 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStartHere(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"capability_manifest":   capabilityManifest(),
-		"openapi_url":           "/openapi.json",
-		"mcp_manifest":          mcpManifest(),
-		"api_key_instructions":  apiKeyInstructions(),
-		"example_payloads":      examplePayloads(),
+		"capability_manifest":  capabilityManifest(),
+		"openapi_url":          "/openapi.json",
+		"mcp_manifest":         mcpManifest(),
+		"api_key_instructions": apiKeyInstructions(),
+		"example_payloads":     examplePayloads(),
 	})
 }
 
@@ -213,6 +213,21 @@ type ingestEnvelope struct {
 
 // handleCollect serves POST /v1/collect and POST /mcp/tools/ingest_event.
 func (s *Server) handleCollect(w http.ResponseWriter, r *http.Request) {
+	agent := agentFrom(r.Context())
+	idemKey := r.Header.Get("Idempotency-Key")
+	if idemKey != "" && s.idem != nil {
+		existing, err := s.idem.GetIdempotencyResponse(r.Context(), idemKey, agent.ID)
+		if err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(existing)
+			return
+		}
+		if !errors.Is(err, ErrNotFound) {
+			writeError(w, http.StatusInternalServerError, "idempotency lookup failed")
+			return
+		}
+	}
 	var req collectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "malformed event payload")
@@ -222,7 +237,6 @@ func (s *Server) handleCollect(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "category, timestamp and payload are required")
 		return
 	}
-	agent := agentFrom(r.Context())
 	env := ingestEnvelope{
 		EventID:    uuid.NewString(),
 		AgentID:    agent.ID.String(),
@@ -243,7 +257,48 @@ func (s *Server) handleCollect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.ingestedEvents.WithLabelValues(req.Category, "event").Inc()
-	writeJSON(w, http.StatusCreated, map[string]string{"event_id": env.EventID, "status": "accepted"})
+	resp := map[string]string{"event_id": env.EventID, "status": "accepted"}
+	if idemKey != "" && s.idem != nil {
+		if raw, err := json.Marshal(resp); err == nil {
+			if eventID, err := uuid.Parse(env.EventID); err == nil {
+				_ = s.idem.SaveIdempotencyResponse(r.Context(), idemKey, agent.ID, eventID, raw)
+			}
+		}
+	}
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+// --- agent tokens ---
+
+type createAgentTokenRequest struct {
+	TTLSeconds int `json:"ttl_seconds"`
+}
+
+// handleCreateAgentToken exchanges an API key for a short-lived agent JWT.
+func (s *Server) handleCreateAgentToken(w http.ResponseWriter, r *http.Request) {
+	var req createAgentTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	ttl := 3600
+	if req.TTLSeconds != 0 {
+		ttl = req.TTLSeconds
+	}
+	if ttl < 1 || ttl > 86400 {
+		writeError(w, http.StatusBadRequest, "ttl_seconds must be between 1 and 86400")
+		return
+	}
+	agent := agentFrom(r.Context())
+	token, expires, err := s.issueAgentToken(agent.ID, time.Duration(ttl)*time.Second)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to issue token")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{
+		"token":      token,
+		"expires_at": expires.UTC().Format(time.RFC3339),
+	})
 }
 
 // handleOTLP serves the OTLP/HTTP passthrough endpoints. The raw body is

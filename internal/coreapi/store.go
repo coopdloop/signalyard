@@ -2,6 +2,7 @@ package coreapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -37,13 +38,13 @@ type APIKey struct {
 }
 
 type Event struct {
-	ID        uuid.UUID       `json:"event_id"`
-	AgentID   *uuid.UUID      `json:"agent_id,omitempty"`
-	Category  string          `json:"category"`
-	Source    string          `json:"source,omitempty"`
-	Timestamp time.Time       `json:"timestamp"`
-	Payload   map[string]any  `json:"payload"`
-	CreatedAt time.Time       `json:"created_at"`
+	ID        uuid.UUID      `json:"event_id"`
+	AgentID   *uuid.UUID     `json:"agent_id,omitempty"`
+	Category  string         `json:"category"`
+	Source    string         `json:"source,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
+	Payload   map[string]any `json:"payload"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type User struct {
@@ -237,6 +238,31 @@ func (s *Store) UpsertUserByOIDC(ctx context.Context, email, subject, displayNam
 		return User{}, fmt.Errorf("upsert user: %w", err)
 	}
 	return u, nil
+}
+
+// idempotencyStore backs the Idempotency-Key handling on /v1/collect.
+// Defined as an interface so handlers can be unit-tested with a fake.
+type idempotencyStore interface {
+	GetIdempotencyResponse(ctx context.Context, key string, agentID uuid.UUID) (json.RawMessage, error)
+	SaveIdempotencyResponse(ctx context.Context, key string, agentID, eventID uuid.UUID, response json.RawMessage) error
+}
+
+func (s *Store) GetIdempotencyResponse(ctx context.Context, key string, agentID uuid.UUID) (json.RawMessage, error) {
+	var resp json.RawMessage
+	err := s.pool.QueryRow(ctx, `
+		SELECT response FROM idempotency_keys WHERE key = $1 AND agent_id = $2`, key, agentID).Scan(&resp)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return resp, err
+}
+
+func (s *Store) SaveIdempotencyResponse(ctx context.Context, key string, agentID, eventID uuid.UUID, response json.RawMessage) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO idempotency_keys (key, agent_id, event_id, response)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (key, agent_id) DO NOTHING`, key, agentID, eventID, response)
+	return err
 }
 
 func slugify(name string) string {

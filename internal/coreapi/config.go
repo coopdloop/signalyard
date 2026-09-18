@@ -9,18 +9,20 @@ import (
 // Config holds all environment-driven settings for core_api_gateway.
 // Names match the product spec (docs/product.json).
 type Config struct {
-	Port                  int    // PORT (default 8080)
-	PostgresDSN           string // POSTGRES_DSN (required)
-	NATSUrl               string // NATS_URL (required)
-	OIDCIssuerURL         string // OIDC_ISSUER_URL (required by spec; /login returns 503 if unset)
-	OIDCClientID          string // OIDC_CLIENT_ID
-	OIDCClientSecret      string // OIDC_CLIENT_SECRET
-	JWTSigningSecret      string // JWT_SIGNING_SECRET (required)
-	HECTokenSalt          string // HEC_TOKEN_SALT (required)
-	OTELCollectorEndpoint string // OTEL_COLLECTOR_ENDPOINT
-	SchemaRegistryURL     string // SCHEMA_REGISTRY_URL (dependency arrives in Phase 2)
-	DevAdminToken         string // DEV_ADMIN_TOKEN (optional, local dev only)
-	RunMigrations         bool   // RUN_MIGRATIONS (default false)
+	Port                  int     // PORT (default 8080)
+	PostgresDSN           string  // POSTGRES_DSN (required)
+	NATSUrl               string  // NATS_URL (required)
+	OIDCIssuerURL         string  // OIDC_ISSUER_URL (required by spec; /login returns 503 if unset)
+	OIDCClientID          string  // OIDC_CLIENT_ID
+	OIDCClientSecret      string  // OIDC_CLIENT_SECRET
+	JWTSigningSecret      string  // JWT_SIGNING_SECRET (required)
+	HECTokenSalt          string  // HEC_TOKEN_SALT (required)
+	OTELCollectorEndpoint string  // OTEL_COLLECTOR_ENDPOINT
+	SchemaRegistryURL     string  // SCHEMA_REGISTRY_URL (dependency arrives in Phase 2)
+	DevAdminToken         string  // DEV_ADMIN_TOKEN (optional, local dev only)
+	RunMigrations         bool    // RUN_MIGRATIONS (default false)
+	RateLimitRPS          float64 // RATE_LIMIT_RPS (default 50)
+	RateLimitBurst        float64 // RATE_LIMIT_BURST (default 100)
 }
 
 func LoadConfig() (*Config, error) {
@@ -37,6 +39,22 @@ func LoadConfig() (*Config, error) {
 		SchemaRegistryURL:     os.Getenv("SCHEMA_REGISTRY_URL"),
 		DevAdminToken:         os.Getenv("DEV_ADMIN_TOKEN"),
 		RunMigrations:         os.Getenv("RUN_MIGRATIONS") == "true",
+		RateLimitRPS:          50,
+		RateLimitBurst:        100,
+	}
+	if v := os.Getenv("RATE_LIMIT_RPS"); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid RATE_LIMIT_RPS %q: %w", v, err)
+		}
+		cfg.RateLimitRPS = f
+	}
+	if v := os.Getenv("RATE_LIMIT_BURST"); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid RATE_LIMIT_BURST %q: %w", v, err)
+		}
+		cfg.RateLimitBurst = f
 	}
 	if v := os.Getenv("PORT"); v != "" {
 		p, err := strconv.Atoi(v)
