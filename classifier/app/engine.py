@@ -142,8 +142,16 @@ class Engine:
         )
 
     async def _submit_proposal(self, cluster: Cluster, c: Classification) -> str:
+        # The proposal category must match the quarantined events' category:
+        # the normalizer's approval-driven replay looks up quarantine rows by
+        # raw_payload category, so an LLM rename would strand the events
+        # (producers keep sending the original category anyway). The LLM's
+        # suggested name is advisory and logged, not adopted.
+        if cluster.category_hint and cluster.category_hint != c.category:
+            log.info("LLM suggested rename %s -> %s; keeping original category",
+                     cluster.category_hint, c.category)
         body = {
-            "category": c.category,
+            "category": cluster.category_hint or c.category,
             "generated_by": f"classifier-agent/{c.model}",
             "json_schema_patch": c.json_schema,
             "routing_yaml_diff": c.routing_yaml,
