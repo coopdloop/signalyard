@@ -1,0 +1,63 @@
+{
+  "realm": "signalyard",
+  "enabled": true,
+  "users": [
+    {
+      "username": "approver",
+      "enabled": true,
+      "email": "approver@signalyard.local",
+      "firstName": "Ada",
+      "lastName": "Approver",
+      "credentials": [{"type": "password", "value": "approver", "temporary": false}],
+      "realmRoles": ["approver"]
+    },
+    {
+      "username": "viewer",
+      "enabled": true,
+      "email": "viewer@signalyard.local",
+      "credentials": [{"type": "password", "value": "viewer", "temporary": false}],
+      "realmRoles": ["viewer"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {"name": "admin"},
+      {"name": "approver"},
+      {"name": "viewer"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "signalyard-dashboard",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8085/*", "http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:8085", "http://localhost:5173"],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "protocolMappers": [
+        {
+          "name": "role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "role",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "multivalued": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "signalyard-core",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "dev-core-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false
+    }
+  ]
+}

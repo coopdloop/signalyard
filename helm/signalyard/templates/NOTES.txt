@@ -1,0 +1,11 @@
+Signal Yard installed.
+
+Services:
+  core-api-gateway :8080   kubectl port-forward svc/{{ .Release.Name }}-core-api-gateway 8080:8080
+  schema-registry  :8082   kubectl port-forward svc/{{ .Release.Name }}-schema-registry 8082:8082
+  normalizer       :8081
+  webhook-adapter  :8084
+  classifier       :8083
+  dashboard        :80     kubectl port-forward svc/{{ .Release.Name }}-dashboard 8085:80
+
+First agent onboarding: GET http://localhost:8080/start-here-agents

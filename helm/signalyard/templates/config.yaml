@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "signalyard.fullname" . }}-config
+  labels:
+    {{- include "signalyard.labels" . | nindent 4 }}
+data:
+  POSTGRES_DSN: {{ .Values.config.postgresDSN | quote }}
+  NATS_URL: {{ .Values.config.natsURL | quote }}
+  SCHEMA_REGISTRY_URL: {{ .Values.config.schemaRegistryURL | quote }}
+  OTEL_COLLECTOR_ENDPOINT: {{ .Values.config.otelCollectorEndpoint | quote }}
+  LOKI_PUSH_URL: {{ .Values.config.lokiPushURL | quote }}
+  OIDC_ISSUER_URL: {{ .Values.config.oidcIssuerURL | quote }}
+  OIDC_CLIENT_ID: {{ .Values.config.oidcClientID | quote }}
+  LLM_PROVIDER: {{ .Values.config.llmProvider | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "signalyard.fullname" . }}-secrets
+  labels:
+    {{- include "signalyard.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  JWT_SIGNING_SECRET: {{ .Values.secrets.jwtSigningSecret | quote }}
+  HEC_TOKEN_SALT: {{ .Values.secrets.hecTokenSalt | quote }}
+  OIDC_CLIENT_SECRET: {{ .Values.secrets.oidcClientSecret | quote }}
+  GITHUB_WEBHOOK_SECRET: {{ .Values.secrets.githubWebhookSecret | quote }}
+  JIRA_WEBHOOK_SECRET: {{ .Values.secrets.jiraWebhookSecret | quote }}
+  PAGERDUTY_WEBHOOK_SECRET: {{ .Values.secrets.pagerdutyWebhookSecret | quote }}
+  MARBLE_JAR_WEBHOOK_SECRET: {{ .Values.secrets.marbleJarWebhookSecret | quote }}
+  ANTHROPIC_API_KEY: {{ .Values.secrets.anthropicApiKey | quote }}
+  OPENAI_API_KEY: {{ .Values.secrets.openaiApiKey | quote }}
+  SCHEMA_REGISTRY_TOKEN: {{ .Values.secrets.schemaRegistryToken | quote }}

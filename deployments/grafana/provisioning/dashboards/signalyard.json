@@ -1,0 +1,53 @@
+{
+  "title": "Signal Yard — Exec Rollup",
+  "uid": "signalyard-exec",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {"from": "now-24h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Events by category (Postgres)",
+      "type": "table",
+      "datasource": {"type": "postgres", "uid": "SignalYard Postgres"},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "targets": [{
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT c.name AS category, COUNT(*) AS events FROM events e JOIN categories c ON c.id = e.category_id GROUP BY c.name ORDER BY events DESC"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Quarantine backlog",
+      "type": "stat",
+      "datasource": {"type": "postgres", "uid": "SignalYard Postgres"},
+      "gridPos": {"h": 9, "w": 6, "x": 12, "y": 0},
+      "targets": [{
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT COUNT(*) FROM quarantine_events WHERE status = 'pending'"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Pending proposals",
+      "type": "stat",
+      "datasource": {"type": "postgres", "uid": "SignalYard Postgres"},
+      "gridPos": {"h": 9, "w": 6, "x": 18, "y": 0},
+      "targets": [{
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT COUNT(*) FROM schema_proposals WHERE status = 'pending'"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Event logs (Loki)",
+      "type": "logs",
+      "datasource": {"type": "loki", "uid": "Loki"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 9},
+      "targets": [{"expr": "{category=~\".+\"}"}]
+    }
+  ]
+}

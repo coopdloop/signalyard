@@ -5,6 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"signalyard/internal/platform"
 )
 
 type Server struct {
@@ -23,6 +25,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	r.Use(platform.CORS)
 
 	// Unauthenticated operational + onboarding endpoints
 	r.Get("/health", s.handleHealth)

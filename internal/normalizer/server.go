@@ -49,6 +49,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	r.Use(platform.CORS)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		platform.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})

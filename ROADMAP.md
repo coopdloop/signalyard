@@ -34,12 +34,16 @@ Single Go binary: public API + MCP server + auth + JetStream publishing.
 - [x] `classifier_agent_service` (Python/FastAPI, :8083): durable quarantine consumer, shape-fingerprint clustering, auto-proposal at threshold, manual classification jobs, pluggable LLM backends (anthropic/openai/ollama/heuristic) with runtime switching, `classifier_runs` recording, Prometheus metrics
 - [x] Full autonomous loop E2E (`scripts/smoke-phase3.sh`): webhook → quarantine → cluster → auto-proposal → human approve → replay → queryable
 
-## Phase 4 — Human Surface + Production Infra
+## Phase 4 — Human Surface + Production Infra ✅
 
-- [ ] React dashboard (per `frontend` in spec): approval queue review/diff, exec rollup, SOAR/dev-agent/PM views
-- [ ] Keycloak OIDC realm, Grafana provisioning (datasources + dashboards)
-- [ ] Helm chart for Kubernetes deployment
-- [ ] OTel Collector wiring for OTLP forwarding + gateway self-instrumentation
+- [x] React dashboard (Vite/zustand/react-router): Login (PKCE SSO + dev token), exec rollup Overview, Approval Queue + Proposal Review, Schema Registry, Agent Registry, Onboarding view, Settings
+- [x] Keycloak realm import (public PKCE dashboard client + confidential core client + dev users), gateway JWKS verification wired via compose
+- [x] Grafana provisioning: Loki/Tempo/Mimir/Postgres datasources + exec rollup dashboard
+- [x] OTel Collector: gateway `/v1/otlp/*` forwards → traces to Tempo, logs to Loki, metrics to Mimir remote-write
+- [x] Normalizer Loki routing live in compose (`targets: [postgres, loki]`)
+- [x] Helm chart (`helm/signalyard`): 5 services + dashboard + Postgres/NATS StatefulSets, lint/template clean
+- [x] CORS on Go APIs for browser access (dev-permissive)
+- [x] `scripts/smoke-phase4.sh`: infra health, datasource/dashboard provisioning, Loki routing, OTLP trace/metric round-trips, dashboard serving
 
 ## Cross-cutting / hardening (ongoing)
 

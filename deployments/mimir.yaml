@@ -1,0 +1,46 @@
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  tsdb:
+    dir: /data/tsdb
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/ruler
+
+alertmanager_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/alertmanager
+
+compactor:
+  data_dir: /data/compactor
+
+ruler:
+  rule_path: /data/ruler-rules
+
+distributor:
+  pool:
+    health_check_ingesters: false
+
+ingester:
+  ring:
+    replication_factor: 1
+    kvstore:
+      store: memberlist
+
+memberlist:
+  abort_if_cluster_join_fails: false
+  bind_port: 7946
+
+limits:
+  accept_ha_samples: true

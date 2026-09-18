@@ -1,0 +1,6 @@
+apiVersion: v2
+name: signalyard
+description: Signal Yard — unified ingestion and observability hub for agents and operators
+type: application
+version: 0.1.0
+appVersion: "0.4.0"

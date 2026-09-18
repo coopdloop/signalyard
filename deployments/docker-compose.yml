@@ -45,7 +45,14 @@ services:
       RUN_MIGRATIONS: "true"
       MIGRATIONS_DIR: /app/migrations
       SCHEMA_REGISTRY_URL: http://schema-registry:8082
-      # OIDC_ISSUER_URL / OIDC_CLIENT_ID / OIDC_CLIENT_SECRET: set when Keycloak lands (Phase 4)
+      OTEL_COLLECTOR_ENDPOINT: otel-collector:4318
+      OIDC_ISSUER_URL: http://localhost:8180/realms/signalyard
+      OIDC_CLIENT_ID: signalyard-dashboard
+      OIDC_CLIENT_SECRET: dev-core-secret
+    extra_hosts:
+      # dev: let the container reach Keycloak via the host-published port so the
+      # token issuer (localhost:8180) matches what the browser sees
+      - "localhost:host-gateway"
     ports:
       - "8080:8080"
     depends_on:
@@ -87,7 +94,7 @@ services:
       HEC_TOKEN_SALT: dev-hec-salt-change-me
       JWT_SIGNING_SECRET: dev-jwt-secret-change-me
       DEV_ADMIN_TOKEN: dev-admin-token
-      # LOKI_PUSH_URL: set when Loki lands (Phase 4)
+      LOKI_PUSH_URL: http://loki:3100/loki/api/v1/push
     ports:
       - "8081:8081"
     depends_on:
@@ -147,6 +154,90 @@ services:
       schema-registry:
         condition: service_started
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - tempo
+      - loki
+      - mimir
+
+  loki:
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - lokidata:/loki
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+      - tempodata:/var/tempo
+    ports:
+      - "3200:3200"
+
+  mimir:
+    image: grafana/mimir:2.15.0
+    command: ["-config.file=/etc/mimir.yaml"]
+    volumes:
+      - ./mimir.yaml:/etc/mimir.yaml:ro
+      - mimirdata:/data
+    ports:
+      - "9009:9009"
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - loki
+      - tempo
+      - mimir
+
+  keycloak:
+    profiles: ["sso"]
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm", "--hostname=http://localhost:8180"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: "8080"
+    volumes:
+      - ./keycloak/realm-signalyard.json:/opt/keycloak/data/import/realm-signalyard.json:ro
+    ports:
+      - "8180:8080"
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.dashboard
+    ports:
+      - "8085:80"
+    depends_on:
+      - core-api-gateway
+      - schema-registry
+
 volumes:
   pgdata:
   natsdata:
+  lokidata:
+  tempodata:
+  mimirdata:
+  grafanadata:

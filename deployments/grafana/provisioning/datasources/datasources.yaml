@@ -1,0 +1,27 @@
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+  - name: Mimir
+    type: prometheus
+    access: proxy
+    url: http://mimir:9009/prometheus
+  - name: SignalYard Postgres
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: signalyard
+    user: signalyard
+    secureJsonData:
+      password: signalyard
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600

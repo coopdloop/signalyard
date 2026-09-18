@@ -1,0 +1,65 @@
+global:
+  imageRegistry: ""
+  imageTag: latest
+  imagePullPolicy: IfNotPresent
+
+# Shared configuration rendered into the signalyard-config ConfigMap.
+config:
+  postgresDSN: "postgres://signalyard:signalyard@signalyard-postgres:5432/signalyard"
+  natsURL: "nats://signalyard-nats:4222"
+  schemaRegistryURL: "http://signalyard-schema-registry:8082"
+  otelCollectorEndpoint: ""
+  lokiPushURL: ""
+  oidcIssuerURL: ""
+  oidcClientID: "signalyard-dashboard"
+  llmProvider: "heuristic"
+
+# Rendered into the signalyard-secrets Secret (base64). Override in prod.
+secrets:
+  jwtSigningSecret: "change-me"
+  hecTokenSalt: "change-me"
+  oidcClientSecret: ""
+  githubWebhookSecret: ""
+  jiraWebhookSecret: ""
+  pagerdutyWebhookSecret: ""
+  marbleJarWebhookSecret: ""
+  anthropicApiKey: ""
+  openaiApiKey: ""
+  schemaRegistryToken: ""
+
+services:
+  core-api-gateway:
+    port: 8080
+    image: signalyard/core-api-gateway
+    env:
+      RUN_MIGRATIONS: "true"
+  schema-registry:
+    port: 8082
+    image: signalyard/schema-registry
+    env: {}
+  normalizer-router:
+    port: 8081
+    image: signalyard/normalizer-router
+    env: {}
+  webhook-adapter:
+    port: 8084
+    image: signalyard/webhook-adapter
+    env: {}
+  classifier:
+    port: 8083
+    image: signalyard/classifier
+    env: {}
+  dashboard:
+    port: 80
+    image: signalyard/dashboard
+    env: {}
+
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  storage: 1Gi
+
+nats:
+  enabled: true
+  image: nats:2.10-alpine
+  storage: 1Gi

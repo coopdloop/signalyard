@@ -15,7 +15,10 @@ A unified ingestion and observability hub connecting SOAR tooling, dev agents, P
 | `schema_registry_service` | Go (chi) | 8082 | ✅ Phase 2 implemented |
 | `classifier_agent_service` | Python (FastAPI) | 8083 | ✅ Phase 3 implemented |
 | `webhook_adapter_service` | Go (chi) | 8084 | ✅ Phase 3 implemented |
-| React dashboard + Keycloak/Grafana/Loki/Tempo/Mimir infra | — | — | ⬜ Phase 4 |
+| React dashboard | React (Vite/zustand) | 8085 | ✅ Phase 4 implemented |
+| Grafana / Loki / Tempo / Mimir / OTel Collector | — | 3000/3100/3200/9009/4317-8 | ✅ Phase 4 implemented |
+| Keycloak OIDC | — | 8180 | ✅ Phase 4 (compose `sso` profile) |
+| Helm chart | — | — | ✅ `helm/signalyard` |
 
 ## Quickstart (dev)
 
@@ -87,6 +90,16 @@ Smoke tests: `./scripts/smoke.sh` (Phase 1), `./scripts/smoke-phase2.sh` (regist
 - Routes per `routing_yaml` (`target:` or `targets:`): `postgres` (structured events table) and `loki` (push API) implemented; `tempo`/`mimir` deferred to the Phase 4 OTel Collector path (events stay durable in the stream).
 - Quarantines unknown/invalid shapes to Postgres + the `quarantine` stream; subscribes `schema.approved` for automatic replay; manual replay via `/v1/quarantine/{id}/replay` and `/v1/replay/category/{category}`.
 - `/v1/routing-stats` reports throughput, validation failure rate, quarantine rate.
+
+## Phase 4 — Human surface + observability backbone
+
+- **Dashboard** (`dashboard/`, served on :8085): Login (Keycloak SSO via PKCE + dev-token fallback), exec rollup Overview, Approval Queue + Proposal Review (approve/reject with notes), Schema Registry, Agent Registry, human view of `/start-here-agents`, Settings. CORS is enabled on the Go APIs for browser access (dev-permissive; restrict at the proxy in prod).
+- **Observability backbone** (ADR-005): OTel Collector receives OTLP from the gateway (`/v1/otlp/*` forwards to `:4318`) and fans out: traces → Tempo, logs → Loki, metrics → Mimir remote-write. The normalizer also routes `loki`-target categories straight to Loki's push API.
+- **Grafana** (:3000, admin/admin): provisioned Loki/Tempo/Mimir/Postgres datasources + a "Signal Yard — Exec Rollup" dashboard.
+- **Keycloak** (optional, `docker compose --profile sso up`, :8180): imports the `signalyard` realm with a public PKCE client (`signalyard-dashboard`), a confidential `signalyard-core` client, and dev users `approver`/`approver` and `viewer`/`viewer`. The gateway verifies ID tokens via JWKS discovery (`OIDC_ISSUER_URL`).
+- **Helm** (`helm/signalyard`): all 5 services + dashboard + Postgres/NATS StatefulSets; `helm template`/`helm lint` clean.
+
+Smoke tests: `./scripts/smoke.sh`, `smoke-phase2.sh`, `smoke-phase3.sh`, `smoke-phase4.sh` (infra + OTLP pipelines + dashboard).
 
 ## Configuration
 

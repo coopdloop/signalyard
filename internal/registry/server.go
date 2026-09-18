@@ -5,6 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"signalyard/internal/platform"
 )
 
 func (s *Server) Router() http.Handler {
@@ -12,6 +14,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	r.Use(platform.CORS)
 
 	r.Get("/health", s.handleHealth)
 

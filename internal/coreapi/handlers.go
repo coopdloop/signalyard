@@ -2,10 +2,13 @@ package coreapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -261,6 +264,13 @@ func (s *Server) handleOTLP(kind string) http.HandlerFunc {
 			writeError(w, http.StatusServiceUnavailable, "ingestion backend unavailable")
 			return
 		}
+		// Forward to the OTel Collector when configured (OTLP/HTTP).
+		if s.cfg.OTELCollectorEndpoint != "" {
+			if err := s.forwardOTLP(r.Context(), kind, ct, body); err != nil {
+				writeError(w, http.StatusBadGateway, "otel collector forward failed")
+				return
+			}
+		}
 		s.metrics.ingestedEvents.WithLabelValues("otlp_"+kind, "otlp").Inc()
 		writeJSON(w, http.StatusCreated, map[string]string{"status": "accepted"})
 	}
@@ -351,6 +361,32 @@ func (s *Server) handleListCategories(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
+}
+
+// forwardOTLP posts the raw OTLP payload to the collector's OTLP/HTTP receiver.
+// The endpoint may be host:port or a full base URL.
+func (s *Server) forwardOTLP(ctx context.Context, kind, contentType string, body []byte) error {
+	base := s.cfg.OTELCollectorEndpoint
+	if !strings.HasPrefix(base, "http") {
+		base = "http://" + base
+	}
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/v1/"+kind, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", contentType)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("collector returned %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func (s *Server) proxyToRegistry(r *http.Request, method, path string, payload any) (int, []byte, error) {
