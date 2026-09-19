@@ -88,7 +88,10 @@ func TestRateLimiterBucketMath(t *testing.T) {
 	l.now = func() time.Time { return now }
 	id := uuid.New()
 
-	if !l.allow(id) || !l.allow(id) {
+	if !l.allow(id) {
+		t.Fatal("first request in burst should be allowed")
+	}
+	if !l.allow(id) {
 		t.Fatal("burst of 2 should be allowed")
 	}
 	if l.allow(id) {

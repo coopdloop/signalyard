@@ -2,6 +2,7 @@
 them via a pluggable LLM backend, and submits schema patch proposals to the
 schema registry for human review.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +11,7 @@ import logging
 from typing import Any
 
 import nats
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel
@@ -166,12 +167,14 @@ async def list_backends() -> dict[str, Any]:
     backends = []
     for name, backend in engine.backends.items():
         status = await backend.health()
-        backends.append({
-            "name": name,
-            "active": name == engine.active_backend_name,
-            "healthy": status.healthy,
-            "detail": status.detail,
-        })
+        backends.append(
+            {
+                "name": name,
+                "active": name == engine.active_backend_name,
+                "healthy": status.healthy,
+                "detail": status.detail,
+            }
+        )
     return {"backends": backends}
 
 

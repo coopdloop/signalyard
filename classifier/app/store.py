@@ -1,4 +1,5 @@
 """Optional Postgres access: classifier_runs recording + quarantine event lookup."""
+
 from __future__ import annotations
 
 import json
@@ -20,9 +21,16 @@ class RunsStore:
         if self.pool:
             await self.pool.close()
 
-    async def record_run(self, quarantine_event_id: str | None, model_name: str,
-                         input_tokens: int, output_tokens: int, duration_ms: int,
-                         status: str, error_message: str) -> None:
+    async def record_run(
+        self,
+        quarantine_event_id: str | None,
+        model_name: str,
+        input_tokens: int,
+        output_tokens: int,
+        duration_ms: int,
+        status: str,
+        error_message: str,
+    ) -> None:
         if not self.pool or not quarantine_event_id:
             return
         try:
@@ -37,7 +45,12 @@ class RunsStore:
                      duration_ms, status, error_message)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """,
-                qid, model_name, input_tokens, output_tokens, duration_ms, status,
+                qid,
+                model_name,
+                input_tokens,
+                output_tokens,
+                duration_ms,
+                status,
                 error_message or None,
             )
 
@@ -53,7 +66,5 @@ class RunsStore:
         if not uuids:
             return []
         async with self.pool.acquire() as conn:
-            rows = await conn.fetch(
-                "SELECT raw_payload FROM quarantine_events WHERE id = ANY($1::uuid[])", uuids
-            )
+            rows = await conn.fetch("SELECT raw_payload FROM quarantine_events WHERE id = ANY($1::uuid[])", uuids)
         return [json.loads(r["raw_payload"]) for r in rows]

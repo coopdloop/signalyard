@@ -1,9 +1,10 @@
 """Unit tests for the pure parts of the classifier: shape clustering,
 schema inference, LLM response parsing, and heuristic classification."""
+
 import asyncio
 
-from app.schema_infer import infer_schema, parse_llm_json, shape_key
 from app.backends import HeuristicBackend
+from app.schema_infer import infer_schema, parse_llm_json, shape_key
 
 
 def test_shape_key_same_shape_different_values():
@@ -21,10 +22,12 @@ def test_shape_key_differs_on_fields_or_types():
 
 
 def test_infer_schema_required_and_types():
-    schema = infer_schema([
-        {"alert_id": "A1", "severity": "high", "count": 3},
-        {"alert_id": "A2", "severity": "low"},
-    ])
+    schema = infer_schema(
+        [
+            {"alert_id": "A1", "severity": "high", "count": 3},
+            {"alert_id": "A2", "severity": "low"},
+        ]
+    )
     assert schema["type"] == "object"
     assert set(schema["required"]) == {"alert_id", "severity"}
     assert schema["properties"]["count"]["type"] == "integer"

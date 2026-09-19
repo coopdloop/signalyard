@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -56,14 +57,16 @@ func (c *RegistryClient) GetSchema(ctx context.Context, category string) (Regist
 	}
 	c.mu.RUnlock()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v1/schemas/"+category, nil)
+	// category originates from event payloads; escape it so it cannot traverse the registry path.
+	endpoint := c.baseURL + "/v1/schemas/" + url.PathEscape(category)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil) //nolint:gosec // baseURL is operator config; category is escaped above
 	if err != nil {
 		return RegistrySchema{}, err
 	}
 	if c.token != "" {
 		req.Header.Set("Authorization", "SignalYard "+c.token)
 	}
-	resp, err := c.http.Do(req)
+	resp, err := c.http.Do(req) //nolint:gosec // endpoint is operator-configured base URL with escaped category
 	if err != nil {
 		// Registry unreachable: fall back to last-known schema if we have one (ADR-003).
 		c.mu.RLock()

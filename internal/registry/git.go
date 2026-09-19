@@ -48,7 +48,7 @@ func NewGoGit(ctx context.Context, repoURL, sshKeyPath, workDir string) (*GoGit,
 	g := &GoGit{}
 
 	if sshKeyPath != "" && strings.HasPrefix(repoURL, "git@") {
-		key, err := os.ReadFile(sshKeyPath)
+		key, err := os.ReadFile(sshKeyPath) //nolint:gosec // operator-supplied deploy key path from config
 		if err != nil {
 			return nil, fmt.Errorf("read ssh key: %w", err)
 		}
@@ -77,17 +77,30 @@ func NewGoGit(ctx context.Context, repoURL, sshKeyPath, workDir string) (*GoGit,
 	return g, nil
 }
 
+// safeCategory rejects category names that could escape the schemas/ directory.
+func safeCategory(category string) (string, error) {
+	if category == "" || category != filepath.Base(category) ||
+		strings.ContainsAny(category, `/\`) || strings.Contains(category, "..") {
+		return "", fmt.Errorf("invalid schema category %q", category)
+	}
+	return category, nil
+}
+
 func (g *GoGit) CommitSchema(_ context.Context, category string, version int, jsonSchema []byte, routingYAML, message string) (string, error) {
+	category, err := safeCategory(category)
+	if err != nil {
+		return "", err
+	}
 	dir := filepath.Join(repoWorkDir(g.repo), "schemas")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil { //nolint:gosec // dir is repo-relative, category validated above
 		return "", err
 	}
 	schemaFile := filepath.Join(dir, category+".schema.json")
 	routingFile := filepath.Join(dir, category+".routing.yaml")
-	if err := os.WriteFile(schemaFile, jsonSchema, 0o644); err != nil {
+	if err := os.WriteFile(schemaFile, jsonSchema, 0o600); err != nil { //nolint:gosec // category validated by safeCategory
 		return "", err
 	}
-	if err := os.WriteFile(routingFile, []byte(routingYAML), 0o644); err != nil {
+	if err := os.WriteFile(routingFile, []byte(routingYAML), 0o600); err != nil { //nolint:gosec // category validated by safeCategory
 		return "", err
 	}
 

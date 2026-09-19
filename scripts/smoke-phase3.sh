@@ -21,7 +21,7 @@ if [ "${SMOKE_RESET:-1}" = "1" ] && docker ps --format '{{.Names}}' 2>/dev/null 
   docker exec signalyard-postgres-1 psql -U signalyard -q -c \
     "TRUNCATE events, quarantine_events, schema_proposals, approval_audit_log, classifier_runs, schemas, categories CASCADE" || true
   # Classifier keeps in-memory clusters; restart so stale event ids don't linger.
-  docker restart signalyard-classifier-1 >/dev/null 2>&1 && sleep 5 || true
+  if docker restart signalyard-classifier-1 >/dev/null 2>&1; then sleep 5; fi
 fi
 
 echo "== service health =="

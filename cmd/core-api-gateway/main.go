@@ -62,7 +62,7 @@ func run() error {
 			if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
 				continue
 			}
-			sql, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			sql, err := os.ReadFile(filepath.Join(dir, e.Name())) //nolint:gosec // migrations dir is operator config; entries enumerated from it
 			if err != nil {
 				return fmt.Errorf("read migration %s: %w", e.Name(), err)
 			}

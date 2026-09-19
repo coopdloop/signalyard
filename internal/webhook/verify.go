@@ -2,7 +2,7 @@ package webhook
 
 import (
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // GitHub X-Hub-Signature (v1) requires HMAC-SHA1 for compat
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"

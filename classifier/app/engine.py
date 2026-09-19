@@ -1,4 +1,5 @@
 """Classification engine: clusters unknown payloads, runs backends, submits proposals."""
+
 from __future__ import annotations
 
 import asyncio
@@ -71,18 +72,14 @@ class Engine:
         async with self._lock:
             cluster = self.clusters.get(key)
             if cluster is None:
-                cluster = Cluster(cluster_id=key, category_hint=category_hint,
-                                  representative_payload=payload)
+                cluster = Cluster(cluster_id=key, category_hint=category_hint, representative_payload=payload)
                 self.clusters[key] = cluster
             event_id = event.get("event_id", "")
             if event_id and event_id not in cluster.event_ids:
                 cluster.event_ids.append(event_id)
             if len(cluster.samples) < 5:
                 cluster.samples.append(payload)
-            should_propose = (
-                len(cluster.event_ids) >= self.cfg.cluster_threshold
-                and not cluster.proposal_submitted
-            )
+            should_propose = len(cluster.event_ids) >= self.cfg.cluster_threshold and not cluster.proposal_submitted
         if should_propose:
             job = await self.start_job(cluster.event_ids[:5], cluster)
             asyncio.create_task(self._run_job_safe(job.job_id))
@@ -148,8 +145,7 @@ class Engine:
         # (producers keep sending the original category anyway). The LLM's
         # suggested name is advisory and logged, not adopted.
         if cluster.category_hint and cluster.category_hint != c.category:
-            log.info("LLM suggested rename %s -> %s; keeping original category",
-                     cluster.category_hint, c.category)
+            log.info("LLM suggested rename %s -> %s; keeping original category", cluster.category_hint, c.category)
         body = {
             "category": cluster.category_hint or c.category,
             "generated_by": f"classifier-agent/{c.model}",
@@ -162,22 +158,17 @@ class Engine:
         if self.cfg.registry_token:
             headers["Authorization"] = f"SignalYard {self.cfg.registry_token}"
         async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                f"{self.cfg.schema_registry_url}/v1/proposals", json=body, headers=headers
-            )
+            resp = await client.post(f"{self.cfg.schema_registry_url}/v1/proposals", json=body, headers=headers)
             if resp.status_code >= 400 and body["sample_event_ids"]:
                 # Sample ids may reference quarantine rows that no longer exist
                 # (e.g. dev DB resets); retry without them rather than drop the proposal.
                 log.warning("proposal with sample ids rejected (%s); retrying without", resp.status_code)
                 body["sample_event_ids"] = []
-                resp = await client.post(
-                    f"{self.cfg.schema_registry_url}/v1/proposals", json=body, headers=headers
-                )
+                resp = await client.post(f"{self.cfg.schema_registry_url}/v1/proposals", json=body, headers=headers)
             resp.raise_for_status()
             return resp.json()["proposal_id"]
 
-    async def _record_run(self, cluster: Cluster | None, c: Classification | None,
-                          status: str, error: str) -> None:
+    async def _record_run(self, cluster: Cluster | None, c: Classification | None, status: str, error: str) -> None:
         if self.runs_store is None or cluster is None:
             return
         try:

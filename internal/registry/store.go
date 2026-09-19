@@ -130,7 +130,7 @@ func (s *Store) CreateSchemaVersion(ctx context.Context, category string, jsonSc
 	if err != nil {
 		return Schema{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	catID, err := s.upsertCategory(ctx, tx, category)
 	if err != nil {

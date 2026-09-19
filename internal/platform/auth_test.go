@@ -11,7 +11,9 @@ func TestHashTokenDependsOnSalt(t *testing.T) {
 	if HashToken("a", "tok") == HashToken("b", "tok") {
 		t.Fatal("hash must depend on salt")
 	}
-	if HashToken("a", "tok") != HashToken("a", "tok") {
+	first := HashToken("a", "tok")
+	second := HashToken("a", "tok")
+	if first != second {
 		t.Fatal("hash must be deterministic")
 	}
 }

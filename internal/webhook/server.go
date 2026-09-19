@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -74,7 +75,6 @@ func NewServer(ctx context.Context, cfg *Config, store *Store, auth *platform.To
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -184,7 +184,7 @@ func (s *Server) handleGetDelivery(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := s.store.GetDelivery(r.Context(), id)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			platform.WriteError(w, http.StatusNotFound, "delivery not found")
 			return
 		}
@@ -209,7 +209,7 @@ func (s *Server) handleRetryDelivery(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := s.store.GetDelivery(r.Context(), id)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			platform.WriteError(w, http.StatusNotFound, "delivery not found")
 			return
 		}

@@ -5,6 +5,7 @@ Each backend is tested against a recorded, realistic provider response:
   - response parsing: provider-specific envelope -> Classification
   - error path: non-200 raises httpx.HTTPStatusError
 """
+
 import asyncio
 import json
 
@@ -130,11 +131,13 @@ OPENAI_RESPONSE = {
     "id": "chatcmpl-abc",
     "object": "chat.completion",
     "model": "gpt-4o-mini",
-    "choices": [{
-        "index": 0,
-        "message": {"role": "assistant", "content": json.dumps(LLM_JSON)},
-        "finish_reason": "stop",
-    }],
+    "choices": [
+        {
+            "index": 0,
+            "message": {"role": "assistant", "content": json.dumps(LLM_JSON)},
+            "finish_reason": "stop",
+        }
+    ],
     "usage": {"prompt_tokens": 280, "completion_tokens": 140, "total_tokens": 420},
 }
 
@@ -208,20 +211,25 @@ def test_ollama_error_path(monkeypatch):
 
 # --- Engine: proposal category must match the quarantine category ---
 
+
 def test_engine_proposal_keeps_quarantine_category(monkeypatch):
     """Regression: an LLM category rename must NOT be adopted in the proposal,
     or the normalizer's approval-driven replay can't find the events."""
+    import types
+
     from app.backends import Classification
     from app.engine import Cluster, Engine
-    import types
 
     calls = patch_client(monkeypatch, FakeResponse({"proposal_id": "p-123"}))
     cfg = types.SimpleNamespace(registry_token="tok", schema_registry_url="http://registry", llm_provider="heuristic")
     engine = Engine(cfg, {}, None)
     cluster = Cluster(cluster_id="k", category_hint="quarantine_category", event_ids=["e1"])
     classification = Classification(
-        category="llm_suggested_name", confidence=0.9,
-        json_schema={"type": "object"}, routing_yaml="target: postgres", model="m",
+        category="llm_suggested_name",
+        confidence=0.9,
+        json_schema={"type": "object"},
+        routing_yaml="target: postgres",
+        model="m",
     )
 
     proposal_id = asyncio.run(engine._submit_proposal(cluster, classification))

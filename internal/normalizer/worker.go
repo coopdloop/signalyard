@@ -118,7 +118,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	<-ctx.Done()
 	ingestCtx.Stop()
 	approvalCtx.Stop()
-	w.nc.Drain()
+	_ = w.nc.Drain()
 	return nil
 }
 

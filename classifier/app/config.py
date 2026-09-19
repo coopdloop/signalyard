@@ -1,4 +1,5 @@
 """Configuration for classifier_agent_service. Names match docs/product.json."""
+
 from __future__ import annotations
 
 import os

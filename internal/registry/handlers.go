@@ -3,6 +3,7 @@ package registry
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -146,7 +147,9 @@ func (s *Server) commitNewSchemaVersion(r *http.Request, category string, jsonSc
 	sha, err := s.git.CommitSchema(r.Context(), category, sc.Version, raw, routingYAML, "")
 	if err != nil {
 		// Postgres holds the canonical row; git failure is logged, not fatal (ADR-003 drift note).
-		return sc, nil
+		slog.WarnContext(r.Context(), "git commit failed; postgres row is canonical",
+			"category", category, "version", sc.Version, "err", err)
+		return sc, nil //nolint:nilerr // intentional: git is a best-effort audit mirror
 	}
 	if sha != "" {
 		_ = s.store.SetSchemaGitSHA(r.Context(), sc.ID, sha)

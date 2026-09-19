@@ -3,6 +3,7 @@
 Used by the heuristic backend (dev default, no LLM required) and as a
 fallback when an LLM returns an unusable response.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -66,7 +67,7 @@ def parse_llm_json(text: str) -> dict[str, Any]:
     cleaned = text.strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
-        lines = [l for l in lines if not l.strip().startswith("```")]
+        lines = [line for line in lines if not line.strip().startswith("```")]
         cleaned = "\n".join(lines).strip()
     start = cleaned.find("{")
     end = cleaned.rfind("}")

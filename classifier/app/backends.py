@@ -4,6 +4,7 @@ The spec's tech stack suggests langchain/instructor; we call the provider
 APIs directly over httpx to keep the image lean and the failure modes
 explicit. Structured output is enforced by prompt + parse_llm_json.
 """
+
 from __future__ import annotations
 
 import time
@@ -121,7 +122,9 @@ class AnthropicBackend(Backend):
     async def health(self) -> BackendStatus:
         ok = bool(self.api_key)
         return BackendStatus(
-            name=self.name, active=ok, healthy=ok,
+            name=self.name,
+            active=ok,
+            healthy=ok,
             detail="api key configured" if ok else "ANTHROPIC_API_KEY not set",
         )
 
@@ -166,7 +169,9 @@ class OpenAIBackend(Backend):
     async def health(self) -> BackendStatus:
         ok = bool(self.api_key)
         return BackendStatus(
-            name=self.name, active=ok, healthy=ok,
+            name=self.name,
+            active=ok,
+            healthy=ok,
             detail="api key configured" if ok else "OPENAI_API_KEY not set",
         )
 
@@ -206,8 +211,9 @@ class OllamaBackend(Backend):
         try:
             async with httpx.AsyncClient(timeout=3) as client:
                 resp = await client.get(f"{self.base_url}/api/tags")
-            return BackendStatus(name=self.name, active=True, healthy=resp.status_code == 200,
-                                 detail=f"{self.base_url} reachable")
+            return BackendStatus(
+                name=self.name, active=True, healthy=resp.status_code == 200, detail=f"{self.base_url} reachable"
+            )
         except Exception as exc:
             return BackendStatus(name=self.name, active=True, healthy=False, detail=str(exc))
 

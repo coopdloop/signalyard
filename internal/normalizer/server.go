@@ -1,6 +1,7 @@
 package normalizer
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -47,7 +48,6 @@ func NewServer(cfg *Config, store *Store, worker *Worker, auth *platform.TokenAu
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(platform.CORS)
 
@@ -85,7 +85,7 @@ func (s *Server) handleGetQuarantine(w http.ResponseWriter, r *http.Request) {
 	}
 	q, err := s.store.GetQuarantined(r.Context(), id)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			platform.WriteError(w, http.StatusNotFound, "event not found")
 			return
 		}
@@ -110,7 +110,7 @@ func (s *Server) handleReplayOne(w http.ResponseWriter, r *http.Request) {
 	}
 	q, err := s.store.GetQuarantined(r.Context(), id)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			platform.WriteError(w, http.StatusNotFound, "event not found")
 			return
 		}
@@ -136,7 +136,7 @@ func (s *Server) handleReplayOne(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleReplayCategory(w http.ResponseWriter, r *http.Request) {
 	category := chi.URLParam(r, "category")
 	if _, err := s.worker.registry.GetSchema(r.Context(), category); err != nil {
-		if err == ErrSchemaNotFound {
+		if errors.Is(err, ErrSchemaNotFound) {
 			platform.WriteError(w, http.StatusNotFound, "no schema for category")
 			return
 		}

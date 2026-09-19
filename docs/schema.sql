@@ -194,4 +194,3 @@ CREATE TABLE webhook_deliveries (
 CREATE INDEX idx_webhook_deliveries_webhook_source_id ON webhook_deliveries (webhook_source_id);
 CREATE INDEX idx_webhook_deliveries_event_id ON webhook_deliveries (event_id);
 CREATE INDEX idx_webhook_deliveries_created_at ON webhook_deliveries (created_at);
-

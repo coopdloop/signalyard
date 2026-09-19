@@ -5,6 +5,7 @@ set -euo pipefail
 
 ENV_FILE="$HOME/.signalyard-llm.env"
 [ -f "$ENV_FILE" ] || { echo "FAIL: $ENV_FILE missing (needs ANTHROPIC_API_KEY or OPENAI_API_KEY)"; exit 1; }
+# shellcheck source=/dev/null # operator-provided env file outside the repo
 source "$ENV_FILE"
 PROVIDER="${LLM_PROVIDER:-anthropic}"
 KEY_VAR="${PROVIDER^^}_API_KEY"  # e.g. ANTHROPIC_API_KEY

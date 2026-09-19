@@ -2,6 +2,7 @@
 HEC-style machine API keys (HMAC-SHA256 with HEC_TOKEN_SALT against the shared
 api_keys table) plus an optional static dev admin token.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -19,7 +20,7 @@ def extract_token(request: Request) -> str:
     header = request.headers.get("authorization", "")
     for scheme in ("SignalYard ", "Splunk ", "Bearer "):
         if header.startswith(scheme):
-            return header[len(scheme):].strip()
+            return header[len(scheme) :].strip()
     return request.headers.get("x-signalyard-token", "")
 
 

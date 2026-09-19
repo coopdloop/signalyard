@@ -93,7 +93,9 @@ func (s *Server) RequireAPIKey(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "agent not found for token")
 			return
 		}
-		go s.store.TouchAPIKey(context.Background(), key.ID)
+		// Fire-and-forget: outlives the request, but keeps trace/log values.
+		touchCtx := context.WithoutCancel(r.Context())
+		go s.store.TouchAPIKey(touchCtx, key.ID)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxAgent, agent)))
 	})
 }

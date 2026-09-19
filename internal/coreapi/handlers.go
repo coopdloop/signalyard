@@ -220,7 +220,7 @@ func (s *Server) handleCollect(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(existing)
+			_, _ = w.Write(existing) //nolint:gosec // stored idempotent JSON response, served as application/json
 			return
 		}
 		if !errors.Is(err, ErrNotFound) {
