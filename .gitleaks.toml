@@ -1,0 +1,24 @@
+title = "Signal Yard gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Dev-only placeholders, test fixtures, and generated artifacts"
+paths = [
+  # Local dev/compose fixtures: placeholder credentials only, never real secrets.
+  '''deployments/docker-compose\.yml''',
+  '''deployments/keycloak/realm-signalyard\.json''',
+  '''helm/signalyard/values\.yaml''',
+  '''scripts/smoke.*\.sh''',
+  '''README\.md''',
+  '''Makefile''',
+  # Test fixtures with fake credentials.
+  '''.*_test\.go''',
+  '''classifier/tests/.*\.py''',
+  # Generated / vendored artifacts.
+  '''dashboard/dist/.*''',
+  '''.*\.lock''',
+  '''package-lock\.json''',
+  '''go\.sum''',
+]

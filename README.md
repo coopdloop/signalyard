@@ -129,3 +129,31 @@ Environment variables follow the spec exactly (`services[].environment_variables
 make build test vet   # or: go build ./... && go test ./...
 make up down logs     # docker compose lifecycle
 ```
+
+### Local gates
+
+Install the hooks once, then every commit is formatted, secret-scanned, vetted and tested:
+
+```sh
+pre-commit install
+pre-commit run --all-files
+```
+
+Hooks cover: whitespace/EOF/large-file/private-key checks, [gitleaks](https://github.com/gitleaks/gitleaks)
+secret scanning, `ruff` + `ruff format` (classifier), `shellcheck` (scripts),
+and `gofmt` / `go vet` / `go test` / `pytest`.
+
+### CI
+
+| Workflow | Jobs |
+|---|---|
+| `.github/workflows/ci.yml` | gofmt + build + `go test -race`, golangci-lint, classifier ruff/pytest, dashboard build, Docker builds for all 6 images, Helm lint/template |
+| `.github/workflows/security.yml` | gitleaks, `govulncheck`, CodeQL (Go/Python/JS), Trivy filesystem scan — on PRs and weekly |
+
+Dependabot tracks Go modules, uv, npm, GitHub Actions, and Docker base images.
+
+> **Dev credentials:** every secret in `deployments/`, `helm/`, and `scripts/` is a
+> local placeholder. See [SECURITY.md](SECURITY.md) for what to override before
+> deploying anywhere real.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and PR workflow.

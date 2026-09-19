@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a defect in a Signal Yard service
+labels: [bug]
+body:
+  - type: dropdown
+    id: service
+    attributes:
+      label: Service
+      options:
+        - core_api_gateway
+        - normalizer_router
+        - schema_registry_service
+        - classifier_agent_service
+        - webhook_adapter_service
+        - dashboard
+        - deployments / helm / observability
+        - unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Include the actual behavior and any error output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. make up
+        2. curl -s -X POST localhost:8080/v1/collect ...
+        3. observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        Commit: <sha>
+        OS: macOS 15 / Ubuntu 24.04
+        Deployment: docker compose / helm
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact all tokens and secrets before pasting.
+      render: shell
