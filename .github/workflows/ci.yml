@@ -123,6 +123,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - run: helm lint helm/signalyard
       - run: helm template signalyard helm/signalyard >/dev/null
